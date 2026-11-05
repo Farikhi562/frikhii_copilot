@@ -169,7 +169,8 @@ def update_frontend(api_url: str) -> None:
     if not npm:
         raise SystemExit("npm was not found in PATH.")
     log("Building GitHub Pages bundle...")
-    subprocess.run([npm, "run", "build:pages"], cwd=ROOT / "apps" / "web", check=True)
+    build_command = ["cmd", "/c", npm, "run", "build:pages"] if os.name == "nt" else [npm, "run", "build:pages"]
+    subprocess.run(build_command, cwd=ROOT / "apps" / "web", check=True)
 
     remote = subprocess.check_output(
         ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True
