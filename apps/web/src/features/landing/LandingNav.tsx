@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Mark } from "../../components/brand/Mark";
+import { LanguageToggle } from "../../components/ui/LanguageToggle";
 
 export const navLinks = [
   { href: "#trailer", label: "Product" },
@@ -38,6 +39,7 @@ export function LandingNav() {
           ))}
         </ul>
         <div className="flex items-center gap-3 text-sm sm:gap-5">
+          <LanguageToggle />
           <Link to="/login" className="hidden text-ink/75 hover:text-ink sm:inline">
             Sign in
           </Link>

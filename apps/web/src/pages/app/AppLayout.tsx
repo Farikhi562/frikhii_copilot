@@ -5,6 +5,7 @@ import { AccountMenu } from "../../components/auth/AccountMenu";
 import { Mark } from "../../components/brand/Mark";
 import { Dialog } from "../../components/ui/Dialog";
 import { Avatar } from "../../components/ui/Form";
+import { LanguageToggle } from "../../components/ui/LanguageToggle";
 import { NavItem, Sidebar, Topbar, type NavEntry } from "../../components/ui/Nav";
 import { toast } from "../../components/ui/Toast";
 import { Button } from "../../components/ui/Button";
@@ -77,6 +78,7 @@ export default function AppLayout() {
           onMenu={() => setMenu(true)}
           actions={
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <span className="hidden font-mono text-xs text-ink/55 sm:inline">Phase 03</span>
               <AccountMenu
                 name={name}

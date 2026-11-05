@@ -26,4 +26,8 @@ export default defineConfig({
   // Keep one .env file at the repository root (see .env.example), not per workspace.
   envDir: "../../",
   plugins: [react(), tailwind(), allowLargeRequestHeaders()],
+  preview: {
+    // Allows access through temporary tunnel hostnames for remote previews.
+    allowedHosts: true,
+  },
 });

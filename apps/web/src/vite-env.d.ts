@@ -8,6 +8,13 @@ interface ImportMetaEnv {
   readonly VITE_CORE_API_URL?: string;
 }
 
+interface Window {
+  /** Optional runtime config loaded from /config.js, so Pages deploys can change the API URL without a rebuild. */
+  FRIKHII_CONFIG?: {
+    coreApiUrl?: string;
+  };
+}
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }

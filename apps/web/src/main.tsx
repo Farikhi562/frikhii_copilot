@@ -7,6 +7,7 @@ import { AppRoutes } from "./app/router";
 import { Toaster } from "./components/ui/Toast";
 import { AuthProvider } from "./features/auth/AuthProvider";
 import { AuthQueryReset } from "./features/auth/components/AuthQueryReset";
+import { I18nProvider } from "./lib/i18n";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,13 +21,15 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AuthQueryReset />
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-      <Toaster />
+      <I18nProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AuthQueryReset />
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+        <Toaster />
+      </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
