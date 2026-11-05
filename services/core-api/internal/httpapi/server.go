@@ -40,6 +40,11 @@ func (s *Server) Router() http.Handler {
 	router.Use(s.cors)
 	router.Use(middleware.RequestSize(s.cfg.MaxRequestBytes))
 
+	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"service":"frikhii-core-api","status":"ok"}`))
+	})
 	router.Get("/healthz", s.health)
 	router.Get("/readyz", s.ready)
 

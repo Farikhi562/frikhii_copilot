@@ -33,6 +33,7 @@ const normalize = (value: string) =>
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u00b7/g, "-")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -189,6 +190,8 @@ const indonesian: Record<string, string> = {
   "deep dive": "Pendalaman",
   "go further into the reasoning behind an idea.":
     "Telusuri lebih jauh alasan di balik sebuah gagasan.",
+  "clear explanations of a concept, matched to your level.":
+    "Penjelasan konsep yang jelas, disesuaikan dengan levelmu.",
   "focused exercises on what you are learning.":
     "Latihan terfokus pada apa yang sedang kamu pelajari.",
   "socratic": "Sokratik",
@@ -264,6 +267,17 @@ const indonesian: Record<string, string> = {
   "progress is meant to reflect what you understand, not how much content you opened.":
     "Progres seharusnya mencerminkan pemahamanmu, bukan seberapa banyak konten yang kamu buka.",
   "learn with intent. become capable.": "Belajar dengan niat. Jadi mampu.",
+  "your next chapter starts with what you choose to learn.":
+    "Bab berikutnya dimulai dari apa yang kamu pilih untuk dipelajari.",
+  "start with an ambition. build the knowledge, skills, and confidence to make it real.":
+    "Mulai dari ambisi. Bangun pengetahuan, keterampilan, dan keyakinan untuk mewujudkannya.",
+  "frikhii copilot is a personal ai learning companion that turns learning goals into structured, reviewable courses.":
+    "FRIKHII Copilot adalah pendamping belajar AI personal yang mengubah tujuan belajar menjadi kursus terstruktur yang bisa ditinjau.",
+  "frikhii copilot trailer": "Trailer FRIKHII Copilot",
+  "a short look at how frikhii turns a goal into a learning journey.":
+    "Sekilas tentang bagaimana FRIKHII mengubah tujuan menjadi perjalanan belajar.",
+  "all rights reserved.": "Hak cipta dilindungi.",
+  "frikhii. all rights reserved.": "FRIKHII. Hak cipta dilindungi.",
   "legal": "Legal",
   "privacy": "Privasi",
   "terms": "Ketentuan",
@@ -695,6 +709,9 @@ const indonesian: Record<string, string> = {
   "summary:": "Ringkasan:",
   "deliverable:": "Hasil karya:",
   "knowledge check": "Cek pengetahuan",
+  "concept explanation": "Penjelasan konsep",
+  "introduction": "Pendahuluan",
+  "summary": "Ringkasan",
   "what you will learn": "Apa yang akan kamu pelajari",
   "outcome:": "Hasil:",
   "method:": "Metode:",
@@ -761,6 +778,112 @@ const indonesian: Record<string, string> = {
   "system (light for now)": "Sistem (terang untuk saat ini)",
   "light": "Terang",
 
+  // Additional app, auth and empty-state copy
+  "check your email": "Cek emailmu",
+  "check your email, a reset link is on its way. the link expires after a short time and works once.":
+    "Cek emailmu, tautan reset sedang dikirim. Tautan ini kedaluwarsa setelah beberapa saat dan hanya bisa dipakai sekali.",
+  "reset your password.": "Reset kata sandimu.",
+  "if an account exists for": "Jika ada akun untuk",
+  "open the link in this browser. if it does not arrive, check spam or request another link in a minute.":
+    "Buka tautan itu di browser ini. Jika belum datang, cek folder spam atau minta tautan lain dalam satu menit.",
+  "use a different email": "Gunakan email lain",
+  "request a new link": "Minta tautan baru",
+  "request a new reset link": "Minta tautan reset baru",
+  "confirm new password": "Konfirmasi kata sandi baru",
+  "password updated": "Kata sandi diperbarui",
+  "continue to the app": "Lanjut ke aplikasi",
+  "sign in with the new password": "Masuk dengan kata sandi baru",
+  "use a password you have not used before.": "Gunakan kata sandi yang belum pernah dipakai.",
+  "updating the password for": "Memperbarui kata sandi untuk",
+  "verifying your reset link…": "Memverifikasi tautan resetmu…",
+  "verifying your secure link…": "Memverifikasi tautan amanmu…",
+  "link invalid or expired": "Tautan tidak valid atau kedaluwarsa",
+  "verification failed": "Verifikasi gagal",
+  "password recovery needs a configured supabase project.":
+    "Pemulihan kata sandi memerlukan proyek Supabase yang sudah dikonfigurasi.",
+  "this link needs a configured supabase project.":
+    "Tautan ini memerlukan proyek Supabase yang sudah dikonfigurasi.",
+  "connect supabase first.": "Hubungkan Supabase terlebih dahulu.",
+  "supabase needs to be connected.": "Supabase perlu dihubungkan.",
+  "could not continue": "Tidak bisa melanjutkan",
+  "checking your session…": "Memeriksa sesimu…",
+  "frikhii copilot is a personal ai learning companion. your learning data belongs to you.":
+    "FRIKHII Copilot adalah pendamping belajar AI personal. Data belajarmu milikmu.",
+  "turn ambition into capability.": "Ubah ambisi menjadi kemampuan.",
+  "learn with intent": "Belajar dengan niat",
+  "define your goal": "Tentukan tujuanmu",
+  "build your roadmap": "Bangun peta jalanmu",
+  "learn with ai": "Belajar dengan AI",
+  "practice and prove it": "Berlatih dan buktikan",
+  "honest answers, before you begin.": "Jawaban jujur, sebelum kamu mulai.",
+  "what frikhii copilot does today, what is still being built, and where you should keep using your own judgment.":
+    "Apa yang sudah dilakukan FRIKHII Copilot hari ini, apa yang masih dibangun, dan di mana kamu tetap perlu memakai penilaianmu sendiri.",
+  "drafts to review": "Draf untuk ditinjau",
+  "create a learning goal": "Buat tujuan belajar",
+  "create your first course": "Buat kursus pertamamu",
+  "new course": "Kursus baru",
+  "no courses yet": "Belum ada kursus",
+  "no curriculum yet": "Belum ada kurikulum",
+  "view all": "Lihat semua",
+  "see diagnostic result": "Lihat hasil diagnostik",
+  "your goal pipeline": "Alur tujuanmu",
+  "dashboard counts come from the core api. lesson completion and study-time progress are not tracked in phase 03, so no completion percentage is shown.":
+    "Angka dasbor berasal dari Core API. Penyelesaian pelajaran dan progres waktu belajar belum dilacak di Fase 03, jadi tidak ada persentase penyelesaian.",
+  "course content and versions are stored by the core api. lesson playback and progress tracking are outside phase 03.":
+    "Konten dan versi kursus disimpan oleh Core API. Pemutaran pelajaran dan pelacakan progres berada di luar Fase 03.",
+  "course not found": "Kursus tidak ditemukan",
+  "draft not found": "Draf tidak ditemukan",
+  "review and approve": "Tinjau dan setujui",
+  "review the draft": "Tinjau draf",
+  "suggested search topics": "Saran topik pencarian",
+  "this curriculum is not approved yet. review the draft and approve it to enroll.":
+    "Kurikulum ini belum disetujui. Tinjau draf dan setujui untuk mengikutinya.",
+  "lesson playback and per-lesson progress are not part of phase 03. the curriculum, enrollment and version history are real and persisted.":
+    "Pemutaran pelajaran dan progres per pelajaran bukan bagian dari Fase 03. Kurikulum, pendaftaran, dan riwayat versi sudah nyata dan tersimpan.",
+  "approve and enroll": "Setujui dan ikuti",
+  "could not approve": "Gagal menyetujui",
+  "could not regenerate": "Gagal membuat ulang",
+  "discard changes": "Buang perubahan",
+  "generate a new draft": "Buat draf baru",
+  "open the course": "Buka kursus",
+  "there is no draft under review. you can read the enrolled curriculum, or ask the architect for a new draft. a new draft does not replace this version until you approve it.":
+    "Tidak ada draf yang sedang ditinjau. Kamu bisa membaca kurikulum yang diikuti atau meminta arsitek membuat draf baru. Draf baru tidak menggantikan versi ini sampai kamu menyetujuinya.",
+  "this can take up to a couple of minutes. you can leave this page; the server continues.":
+    "Proses ini bisa memakan waktu beberapa menit. Kamu boleh meninggalkan halaman ini; server tetap bekerja.",
+  "you are reviewing a newer draft. your enrolled curriculum does not change until you approve this draft.":
+    "Kamu sedang meninjau draf yang lebih baru. Kurikulum yang kamu ikuti tidak berubah sampai kamu menyetujui draf ini.",
+  "edit the framing, module names, or class descriptions. regenerate for a different approach. approve only when the plan is right for you.":
+    "Edit kerangka, nama modul, atau deskripsi kelas. Buat ulang untuk pendekatan berbeda. Setujui hanya jika rencananya sudah tepat untukmu.",
+  "describe what should change. the architect creates a new draft; the previous approved version stays live and untouched.":
+    "Jelaskan apa yang harus diubah. Arsitek membuat draf baru; versi yang sudah disetujui tetap aktif dan tidak berubah.",
+  "drafts are not enrolled until you approve them. an approved older version stays live while a newer draft is under review.":
+    "Draf tidak diikuti sampai kamu menyetujuinya. Versi lama yang sudah disetujui tetap aktif selama draf baru ditinjau.",
+  "answer in your own words. this is not a pass/fail test; it helps the architect avoid repeating what you already know and target the real gaps.":
+    "Jawab dengan kata-katamu sendiri. Ini bukan tes lulus/gagal; jawabanmu membantu arsitek menghindari pengulangan dan menyasar celah yang sebenarnya.",
+  "evaluating your answers…": "Mengevaluasi jawabanmu…",
+  "generate diagnostic": "Buat diagnostik",
+  "open the result": "Buka hasil",
+  "retry evaluation": "Coba lagi evaluasi",
+  "retry to create a fresh question set.": "Coba lagi untuk membuat set pertanyaan baru.",
+  "submit for evaluation": "Kirim untuk evaluasi",
+  "the evaluation did not complete. you can retry without retyping your answers.":
+    "Evaluasi tidak selesai. Kamu bisa mencoba lagi tanpa mengetik ulang jawaban.",
+  "generate my curriculum": "Buat kurikulum saya",
+  "generation is in progress": "Pembuatan sedang berlangsung",
+  "open the enrolled course": "Buka kursus yang diikuti",
+  "return to the diagnostic": "Kembali ke diagnostik",
+  "start diagnostic": "Mulai diagnostik",
+  "the diagnostic is currently": "Diagnostik saat ini",
+  "the evaluation is generated from your written answers. it can be wrong, and it is not a formal assessment. you can still review and revise the curriculum.":
+    "Evaluasi dihasilkan dari jawaban tertulismu. Hasilnya bisa salah dan bukan asesmen formal. Kamu tetap bisa meninjau dan merevisi kurikulum.",
+  "back to the result": "Kembali ke hasil",
+  "the architect is turning your goal and diagnostic into modules, classes and lessons. nothing is enrolled yet; you will review the draft first.":
+    "Arsitek sedang mengubah tujuan dan diagnostikmu menjadi modul, kelas, dan pelajaran. Belum ada yang diikuti; kamu akan meninjau drafnya terlebih dahulu.",
+  "could not load": "Gagal memuat",
+  "why now": "Mengapa sekarang",
+  "your password has been changed. you can keep using this session or sign in again on your other devices.":
+    "Kata sandimu telah diubah. Kamu bisa tetap memakai sesi ini atau masuk lagi di perangkat lain.",
+
   // API / query errors
   "something went wrong. please try again.": "Terjadi kesalahan. Silakan coba lagi.",
   "your session could not be read. sign in again.":
@@ -803,6 +926,9 @@ function translateCore(core: string): string | null {
   const withoutPunctuation = normalized.replace(/[.!?]+$/, "");
   const punctuationless = dictionary[withoutPunctuation];
   if (punctuationless) return punctuationless;
+  const withoutLeading = normalized.replace(/^[.,;:!?]+\s*/, "");
+  const leadingless = dictionary[withoutLeading];
+  if (leadingless) return leadingless;
   for (const [pattern, replacement] of patterns) {
     if (pattern.test(core)) return core.replace(pattern, replacement);
   }
@@ -827,8 +953,12 @@ const TRANSLATED_ATTRIBUTES = ["placeholder", "aria-label", "title", "alt"] as c
 const SKIPPED_TAGS = new Set(["SCRIPT", "STYLE", "CODE", "PRE", "TEXTAREA"]);
 
 function shouldSkip(node: Node): boolean {
-  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
-  return element ? SKIPPED_TAGS.has(element.tagName) : false;
+  let element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  while (element) {
+    if (SKIPPED_TAGS.has(element.tagName)) return true;
+    element = element.parentElement;
+  }
+  return false;
 }
 
 function translateTextNode(node: Text) {
@@ -846,7 +976,7 @@ function translateTextNode(node: Text) {
 }
 
 function translateElement(element: Element) {
-  if (SKIPPED_TAGS.has(element.tagName)) return;
+  if (shouldSkip(element)) return;
   for (const name of TRANSLATED_ATTRIBUTES) {
     const value = element.getAttribute(name);
     if (!value) continue;

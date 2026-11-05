@@ -173,6 +173,21 @@ All endpoints except health/readiness require `Authorization: Bearer <Supabase J
 
 Errors use `{"error":{"code","message","request_id","details?"}}`.
 
+## Deploy the backend without the laptop
+
+The frontend is deployed to GitHub Pages at `https://copilot.frikhii.my.id`. To run
+the Go Core API and Python AI Engine without keeping a laptop online, use the free
+Hugging Face Docker Space path:
+
+```powershell
+C:\Users\ASUS\anaconda3\python.exe scripts\deploy_hf_space.py
+```
+
+The script uploads a clean build context (never `.env` files), sets Space secrets,
+waits for the API to become healthy, then updates the frontend runtime config and
+publishes it to `gh-pages`. See `docs/DEPLOY_HF_SPACES.md` for the one-time Hugging
+Face token setup and troubleshooting.
+
 ## Security notes
 
 - The browser bundle uses only the Supabase **publishable** key. `VITE_SUPABASE_ANON_KEY`

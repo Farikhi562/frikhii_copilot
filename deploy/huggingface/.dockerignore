@@ -1,0 +1,15 @@
+# Never send real environment files to the Space repository or the image.
+**/.env
+**/.env.*
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/tests
+**/node_modules
+**/dist
+**/.git
+**/*.log
