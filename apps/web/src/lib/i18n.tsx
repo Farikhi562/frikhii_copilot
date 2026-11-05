@@ -782,14 +782,14 @@ const indonesian: Record<string, string> = {
 };
 
 const patterns: Array<[RegExp, string]> = [
-  [/^step (\d+)$/, "Langkah $1"],
-  [/^(\d+) minutes$/, "$1 menit"],
-  [/^(\d+) questions? for this goal$/, "$1 pertanyaan untuk tujuan ini"],
-  [/^v(\d+) approved$/, "v$1 disetujui"],
-  [/^v(\d+) draft$/, "v$1 draf"],
-  [/^v(\d+) superseded$/, "v$1 digantikan"],
-  [/^(\d+)h total - (.+)$/, "$1 jam total - $2"],
-  [/^mode - (.+)$/, "Mode - $1"],
+  [/^step (\d+)$/i, "Langkah $1"],
+  [/^(\d+) minutes$/i, "$1 menit"],
+  [/^(\d+) questions? for this goal$/i, "$1 pertanyaan untuk tujuan ini"],
+  [/^v(\d+) approved$/i, "v$1 disetujui"],
+  [/^v(\d+) draft$/i, "v$1 draf"],
+  [/^v(\d+) superseded$/i, "v$1 digantikan"],
+  [/^(\d+)h total - (.+)$/i, "$1 jam total - $2"],
+  [/^mode - (.+)$/i, "Mode - $1"],
 ];
 
 const dictionary = Object.fromEntries(
