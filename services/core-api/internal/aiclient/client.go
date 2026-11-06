@@ -254,6 +254,191 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	return &result, nil
 }
 
+// ── Learning Engine ──────────────────────────────────────────────────────────
+
+// LessonGenerateRequest sent to the AI Engine to expand a blueprint.
+type LessonGenerateRequest struct {
+	LessonID         string         `json:"lesson_id"`
+	Title            string         `json:"title"`
+	Description      string         `json:"description"`
+	Blueprint        map[string]any `json:"blueprint"`
+	CourseTitle      string         `json:"course_title"`
+	ClassTitle       string         `json:"class_title"`
+	LearningLanguage string         `json:"learning_language"`
+	LearnerLevel     string         `json:"learner_level"`
+	RequestID        string         `json:"request_id,omitempty"`
+}
+
+type LessonSection struct {
+	Type  string   `json:"type"`
+	Title string   `json:"title"`
+	Body  string   `json:"body"`
+	Items []string `json:"items"`
+}
+
+type AuthoredLesson struct {
+	LessonID                 string          `json:"lesson_id"`
+	Title                    string          `json:"title"`
+	EstimatedDurationMinutes int             `json:"estimated_duration_minutes"`
+	Sections                 []LessonSection `json:"sections"`
+	KeyTakeaways             []string        `json:"key_takeaways"`
+	FurtherSearchTopics      []string        `json:"further_search_topics"`
+}
+
+type LessonGenerateResponse struct {
+	Lesson   AuthoredLesson            `json:"lesson"`
+	Metadata domain.GenerationMetadata `json:"metadata"`
+}
+
+func (c *Client) GenerateLesson(ctx context.Context, req LessonGenerateRequest) (*LessonGenerateResponse, error) {
+	var result LessonGenerateResponse
+	if err := c.post(ctx, "/internal/v1/lesson/generate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// QuizGenerateRequest asks the AI Engine to produce quiz questions for a class.
+type QuizGenerateRequest struct {
+	ClassID                  string   `json:"class_id"`
+	ClassTitle               string   `json:"class_title"`
+	ClassDescription         string   `json:"class_description"`
+	Competencies             []string `json:"competencies"`
+	KnowledgeCheckDescription string  `json:"knowledge_check_description"`
+	QuestionCount            int      `json:"question_count"`
+	CourseTitle              string   `json:"course_title"`
+	LearningLanguage         string   `json:"learning_language"`
+	LearnerLevel             string   `json:"learner_level"`
+	RequestID                string   `json:"request_id,omitempty"`
+}
+
+type QuizGenerateResponse struct {
+	Questions    []domain.QuizQuestion    `json:"questions"`
+	AnswerKeys   []domain.QuizAnswerKey   `json:"answer_keys"`
+	PassingScore int                      `json:"passing_score"`
+	Metadata     domain.GenerationMetadata `json:"metadata"`
+}
+
+func (c *Client) GenerateQuiz(ctx context.Context, req QuizGenerateRequest) (*QuizGenerateResponse, error) {
+	var result QuizGenerateResponse
+	if err := c.post(ctx, "/internal/v1/quiz/generate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// QuizEvaluateRequest sends answers to the AI Engine for grading.
+type QuizEvaluateRequest struct {
+	ClassID      string                   `json:"class_id"`
+	ClassTitle   string                   `json:"class_title"`
+	Questions    []domain.QuizQuestion    `json:"questions"`
+	AnswerKeys   []domain.QuizAnswerKey   `json:"answer_keys"`
+	Answers      []domain.QuizAnswer      `json:"answers"`
+	PassingScore int                      `json:"passing_score"`
+	RequestID    string                   `json:"request_id,omitempty"`
+}
+
+type QuizEvaluateResponse struct {
+	Evaluation domain.QuizEvaluation     `json:"evaluation"`
+	Metadata   domain.GenerationMetadata `json:"metadata"`
+}
+
+func (c *Client) EvaluateQuiz(ctx context.Context, req QuizEvaluateRequest) (*QuizEvaluateResponse, error) {
+	var result QuizEvaluateResponse
+	if err := c.post(ctx, "/internal/v1/quiz/evaluate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ExerciseGenerateRequest expands a blueprint into a full exercise.
+type ExerciseGenerateRequest struct {
+	ClassID             string `json:"class_id"`
+	ClassTitle          string `json:"class_title"`
+	ExerciseTitle       string `json:"exercise_title"`
+	ExerciseDescription string `json:"exercise_description"`
+	Difficulty          string `json:"difficulty"`
+	Competency          string `json:"competency"`
+	CourseTitle         string `json:"course_title"`
+	LearningLanguage    string `json:"learning_language"`
+	LearnerLevel        string `json:"learner_level"`
+	RequestID           string `json:"request_id,omitempty"`
+}
+
+type ExerciseStep struct {
+	StepNumber  int    `json:"step_number"`
+	Instruction string `json:"instruction"`
+	Hint        string `json:"hint"`
+}
+
+type AuthoredExercise struct {
+	Title               string         `json:"title"`
+	Context             string         `json:"context"`
+	Steps               []ExerciseStep `json:"steps"`
+	ExpectedDeliverable string         `json:"expected_deliverable"`
+	EvaluationCriteria  []string       `json:"evaluation_criteria"`
+	FurtherSearchTopics []string       `json:"further_search_topics"`
+}
+
+type ExerciseGenerateResponse struct {
+	Exercise AuthoredExercise           `json:"exercise"`
+	Metadata domain.GenerationMetadata  `json:"metadata"`
+}
+
+func (c *Client) GenerateExercise(ctx context.Context, req ExerciseGenerateRequest) (*ExerciseGenerateResponse, error) {
+	var result ExerciseGenerateResponse
+	if err := c.post(ctx, "/internal/v1/exercise/generate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RemedialGenerateRequest asks the AI Engine for a remedial study plan.
+type RemedialGenerateRequest struct {
+	ClassID             string                `json:"class_id"`
+	ClassTitle          string                `json:"class_title"`
+	CourseTitle         string                `json:"course_title"`
+	QuizScore           int                   `json:"quiz_score"`
+	PassingScore        int                   `json:"passing_score"`
+	Gaps                []domain.KnowledgeGap `json:"gaps"`
+	Strengths           []string              `json:"strengths"`
+	LearningLanguage    string                `json:"learning_language"`
+	LearnerLevel        string                `json:"learner_level"`
+	WeeklyStudyMinutes  int                   `json:"weekly_study_minutes"`
+	RequestID           string                `json:"request_id,omitempty"`
+}
+
+type RemedialActivity struct {
+	Sequence         int    `json:"sequence"`
+	Title            string `json:"title"`
+	Description      string `json:"description"`
+	ActivityType     string `json:"activity_type"`
+	EstimatedMinutes int    `json:"estimated_minutes"`
+	TargetGap        string `json:"target_gap"`
+}
+
+type RemedialPlan struct {
+	GapSummary              string             `json:"gap_summary"`
+	EstimatedTotalMinutes   int                `json:"estimated_total_minutes"`
+	Activities              []RemedialActivity `json:"activities"`
+	KeyConceptsToRevisit    []string           `json:"key_concepts_to_revisit"`
+	FurtherSearchTopics     []string           `json:"further_search_topics"`
+	Encouragement           string             `json:"encouragement"`
+}
+
+type RemedialGenerateResponse struct {
+	Plan     RemedialPlan               `json:"plan"`
+	Metadata domain.GenerationMetadata  `json:"metadata"`
+}
+
+func (c *Client) GenerateRemedial(ctx context.Context, req RemedialGenerateRequest) (*RemedialGenerateResponse, error) {
+	var result RemedialGenerateResponse
+	if err := c.post(ctx, "/internal/v1/remedial/generate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) post(ctx context.Context, path string, body any, target any) error {
 	if !c.Configured() {
 		return &AIError{Kind: ErrNotConfigured, Code: "ai_not_configured", Message: "The AI engine is not configured."}

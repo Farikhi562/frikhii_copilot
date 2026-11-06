@@ -19,5 +19,6 @@ __pycache__/
 venv/
 supabase/.temp
 supabase/.branches
+.railway-state.json
 .DS_Store
 Thumbs.db

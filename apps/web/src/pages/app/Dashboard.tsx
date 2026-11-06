@@ -9,6 +9,7 @@ import { messageForApiError } from "../../features/course/api/course";
 import { useCourses, useLearningGoals } from "../../features/course/hooks/useCourse";
 import { CourseCard, GoalStatusBadge } from "../../features/course/components/CourseBits";
 import type { LearningGoal } from "../../features/course/schemas/course";
+import { useI18n } from "../../lib/i18n";
 
 function goalAction(goal: LearningGoal): { label: string; to: string } {
   if (goal.status === "approved" && goal.course_id) {
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const goalsQuery = useLearningGoals();
   const coursesQuery = useCourses();
   const name = displayName(profile, user);
+  const { t, language } = useI18n();
 
   const goals = goalsQuery.data ?? [];
   const courses = coursesQuery.data ?? [];
@@ -52,7 +54,9 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">
-            Welcome back, {firstName(name)}.
+            {language === "id"
+              ? `Selamat datang kembali, ${firstName(name)}.`
+              : `Welcome back, ${firstName(name)}.`}
           </h1>
           <p className="mt-2 text-ink/65">Your goals, drafts and enrolled curricula.</p>
         </div>
@@ -98,8 +102,12 @@ export default function Dashboard() {
             <h2 className="mt-2 text-2xl font-semibold">{activeGoal.title}</h2>
             <p className="mt-1 text-paper/70">{activeGoal.goal_statement}</p>
             <p className="mt-2 text-sm text-paper/55">
-              {activeGoal.weekly_study_minutes} minutes/week · {activeGoal.learning_language}
-              {activeGoal.target_date ? ` · target ${activeGoal.target_date}` : ""}
+              {activeGoal.weekly_study_minutes}{" "}
+              {language === "id" ? "menit/minggu" : "minutes/week"} ·{" "}
+              {activeGoal.learning_language}
+              {activeGoal.target_date
+                ? ` · ${t("target")} ${activeGoal.target_date}`
+                : ""}
             </p>
           </div>
           <Link

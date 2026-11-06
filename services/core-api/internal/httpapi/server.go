@@ -73,8 +73,24 @@ func (s *Server) Router() http.Handler {
 			authRouter.Post("/courses/{courseID}/regenerate", s.regenerateCourse)
 			authRouter.Post("/courses/{courseID}/approve", s.approveCourse)
 
+			// Roadmap & lesson playback
+			authRouter.Get("/courses/{courseID}/roadmap", s.getRoadmap)
+			authRouter.Get("/courses/{courseID}/lessons/{lessonID}", s.getLesson)
 			authRouter.Post("/courses/{courseID}/lessons/{lessonID}/complete", s.completeLesson)
 			authRouter.Get("/courses/{courseID}/lessons/completed", s.getCompletedLessons)
+
+			// Exercises
+			authRouter.Get("/courses/{courseID}/classes/{classID}/exercise", s.getExercise)
+			authRouter.Post("/courses/{courseID}/classes/{classID}/exercise/submit", s.submitExercise)
+
+			// Quiz (per-class knowledge check)
+			authRouter.Post("/courses/{courseID}/classes/{classID}/quiz/start", s.startQuiz)
+			authRouter.Get("/courses/{courseID}/classes/{classID}/quiz", s.getLatestQuiz)
+			authRouter.Post("/courses/{courseID}/classes/{classID}/quiz/submit", s.submitQuiz)
+
+			// Remedial plans
+			authRouter.Get("/courses/{courseID}/classes/{classID}/remedial", s.getRemedialPlan)
+			authRouter.Post("/courses/{courseID}/classes/{classID}/remedial/generate", s.generateRemedialPlan)
 
 			authRouter.Post("/conversations", s.createConversation)
 			authRouter.Get("/conversations", s.listConversations)

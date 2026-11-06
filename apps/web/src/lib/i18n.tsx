@@ -902,6 +902,24 @@ const indonesian: Record<string, string> = {
     "Server mengembalikan bentuk respons yang tidak terduga.",
   "could not sign out.": "Gagal keluar.",
   "profile updated.": "Profil diperbarui.",
+
+  // Dashboard dynamic / missing
+  "describe what you want to achieve. the ai course architect will run a short diagnostic and draft a curriculum for you to review.":
+    "Ceritakan apa yang ingin kamu capai. Arsitek Kursus AI akan menjalankan diagnostik singkat dan menyusun kurikulum untuk kamu tinjau.",
+  "a privacy policy will be published before any public launch. phase 02 stores only your name, email and learning preferences in supabase.":
+    "Kebijakan privasi akan diterbitkan sebelum peluncuran publik. Fase 02 hanya menyimpan nama, email, dan preferensi belajarmu di Supabase.",
+  "terms of use will be published before public launch.":
+    "Ketentuan penggunaan akan diterbitkan sebelum peluncuran publik.",
+  "contact details will be added before public launch.":
+    "Detail kontak akan ditambahkan sebelum peluncuran publik.",
+  "this page does not exist.": "Halaman ini tidak ada.",
+  "privacy policy": "Kebijakan privasi",
+  "terms of use": "Ketentuan penggunaan",
+  "page not found": "Halaman tidak ditemukan",
+
+  // DiagnosticResult
+  "recommended start:": "Mulai yang disarankan:",
+  "target": "target",
 };
 
 const patterns: Array<[RegExp, string]> = [
@@ -913,6 +931,19 @@ const patterns: Array<[RegExp, string]> = [
   [/^v(\d+) superseded$/i, "v$1 digantikan"],
   [/^(\d+)h total - (.+)$/i, "$1 jam total - $2"],
   [/^mode - (.+)$/i, "Mode - $1"],
+  [/^(\d+) minutes\/week$/i, "$1 menit/minggu"],
+  [/^· target (.+)$/i, "· target $1"],
+  [/^recommended start: (.+)$/i, "Mulai yang disarankan: $1"],
+  [/^welcome back, (.+)\.$/i, "Selamat datang kembali, $1."],
+  [/^a privacy policy will be published before any public launch\./i,
+    "Kebijakan privasi akan diterbitkan sebelum peluncuran publik."],
+  [/^terms of use will be published before public launch\./i,
+    "Ketentuan penggunaan akan diterbitkan sebelum peluncuran publik."],
+  [/^contact details will be added before public launch\./i,
+    "Detail kontak akan ditambahkan sebelum peluncuran publik."],
+  [/^this page does not exist\.$/i, "Halaman ini tidak ada."],
+  [/^phase 02 stores only your name, email and learning preferences in supabase\.$/i,
+    "Fase 02 hanya menyimpan nama, email, dan preferensi belajarmu di Supabase."],
 ];
 
 const dictionary = Object.fromEntries(

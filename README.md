@@ -175,18 +175,18 @@ Errors use `{"error":{"code","message","request_id","details?"}}`.
 
 ## Deploy the backend without the laptop
 
-The frontend is deployed to GitHub Pages at `https://copilot.frikhii.my.id`. To run
-the Go Core API and Python AI Engine without keeping a laptop online, use the free
-Hugging Face Docker Space path:
+The frontend is deployed to GitHub Pages at `https://copilot.frikhii.my.id`. The
+Go Core API and Python AI Engine currently run on Railway:
 
 ```powershell
-C:\Users\ASUS\anaconda3\python.exe scripts\deploy_hf_space.py
+C:\Users\ASUS\anaconda3\python.exe scripts\set_railway_vars.py --service api
+railway up --ci --service api
+C:\Users\ASUS\anaconda3\python.exe scripts\publish_pages.py --api-url https://api-production-7064.up.railway.app
 ```
 
-The script uploads a clean build context (never `.env` files), sets Space secrets,
-waits for the API to become healthy, then updates the frontend runtime config and
-publishes it to `gh-pages`. See `docs/DEPLOY_HF_SPACES.md` for the one-time Hugging
-Face token setup and troubleshooting.
+See `docs/DEPLOY_RAILWAY.md` for the current URL, environment variables, free-tier
+notes and troubleshooting. A Hugging Face Docker Space path is also available in
+`docs/DEPLOY_HF_SPACES.md` as a no-card alternative.
 
 ## Security notes
 
