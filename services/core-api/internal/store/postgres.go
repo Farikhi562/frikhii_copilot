@@ -1133,7 +1133,7 @@ func (p *Postgres) ListCourses(ctx context.Context, userID string) ([]domain.Cou
 	rows, err := p.pool.Query(ctx, `
 		select c.id::text, c.learning_goal_id::text, c.status,
 			coalesce(c.current_version_id::text,''), coalesce(c.approved_version_id::text,''),
-			coalesce(cv.id::text,''), coalesce(cv.status,''),
+			coalesce(cv.status,''),
 			coalesce(v.id::text,''), coalesce(v.version_number,0), coalesce(v.status,''),
 			coalesce(v.title,''), coalesce(v.short_description,''),
 			coalesce(v.target_learner_level,''), coalesce(v.estimated_duration_minutes,0),
