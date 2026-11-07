@@ -204,6 +204,10 @@ with `invalid_generated_content`; nothing is persisted.
 - Prompt-injection resistance: user text is delimited in prompts and the system prompt
   states that embedded instructions are data, not commands.
 
+## Authenticated workspace
+
+`/app/*` renders inside `AppLayout` (collapsible sidebar, mobile drawer, breadcrumb topbar, search, account menu). Feature code lives in `apps/web/src/features/workspace/`; pages in `apps/web/src/pages/app/`. Course pages read through `useCourseView`, which serves either the real course (TanStack Query) or the labelled built-in demo course (`id = "demo"`). No lesson-progress or tutor backend exists, so those surfaces display plan data only or an honest "not connected" state. Details: `docs/APP_WORKSPACE.md`.
+
 ## Not implemented
 
 - OAuth/social sign-in, magic links, MFA.

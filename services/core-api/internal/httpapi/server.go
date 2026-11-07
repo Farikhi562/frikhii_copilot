@@ -40,65 +40,27 @@ func (s *Server) Router() http.Handler {
 	router.Use(s.cors)
 	router.Use(middleware.RequestSize(s.cfg.MaxRequestBytes))
 
-	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"service":"frikhii-core-api","status":"ok"}`))
-	})
 	router.Get("/healthz", s.health)
 	router.Get("/readyz", s.ready)
 
 	router.Route("/api/v1", func(r chi.Router) {
-		r.Get("/health", s.health)
+		r.Use(s.authenticate)
+		r.Use(s.requireStore)
 
-		r.Group(func(authRouter chi.Router) {
-			authRouter.Use(s.authenticate)
-			authRouter.Use(s.requireStore)
+		r.Post("/learning-goals", s.createLearningGoal)
+		r.Get("/learning-goals", s.listLearningGoals)
+		r.Get("/learning-goals/{goalID}", s.getLearningGoal)
+		r.Post("/learning-goals/{goalID}/diagnostic", s.generateDiagnostic)
+		r.Get("/learning-goals/{goalID}/diagnostic", s.getDiagnostic)
+		r.Post("/learning-goals/{goalID}/diagnostic/submit", s.submitDiagnostic)
+		r.Get("/learning-goals/{goalID}/diagnostic/result", s.diagnosticResult)
+		r.Post("/learning-goals/{goalID}/generate", s.generateCourse)
 
-			authRouter.Get("/dashboard", s.getDashboard)
-			authRouter.Get("/progress", s.getProgress)
-
-			authRouter.Post("/learning-goals", s.createLearningGoal)
-			authRouter.Get("/learning-goals", s.listLearningGoals)
-			authRouter.Get("/learning-goals/{goalID}", s.getLearningGoal)
-			authRouter.Post("/learning-goals/{goalID}/diagnostic", s.generateDiagnostic)
-			authRouter.Get("/learning-goals/{goalID}/diagnostic", s.getDiagnostic)
-			authRouter.Post("/learning-goals/{goalID}/diagnostic/submit", s.submitDiagnostic)
-			authRouter.Get("/learning-goals/{goalID}/diagnostic/result", s.diagnosticResult)
-			authRouter.Post("/learning-goals/{goalID}/generate", s.generateCourse)
-
-			authRouter.Get("/courses", s.listCourses)
-			authRouter.Get("/courses/{courseID}", s.getCourse)
-			authRouter.Patch("/courses/{courseID}/draft", s.updateDraft)
-			authRouter.Post("/courses/{courseID}/regenerate", s.regenerateCourse)
-			authRouter.Post("/courses/{courseID}/approve", s.approveCourse)
-
-			// Roadmap & lesson playback
-			authRouter.Get("/courses/{courseID}/roadmap", s.getRoadmap)
-			authRouter.Get("/courses/{courseID}/lessons/{lessonID}", s.getLesson)
-			authRouter.Post("/courses/{courseID}/lessons/{lessonID}/complete", s.completeLesson)
-			authRouter.Get("/courses/{courseID}/lessons/completed", s.getCompletedLessons)
-
-			// Exercises
-			authRouter.Get("/courses/{courseID}/classes/{classID}/exercise", s.getExercise)
-			authRouter.Post("/courses/{courseID}/classes/{classID}/exercise/submit", s.submitExercise)
-
-			// Quiz (per-class knowledge check)
-			authRouter.Post("/courses/{courseID}/classes/{classID}/quiz/start", s.startQuiz)
-			authRouter.Get("/courses/{courseID}/classes/{classID}/quiz", s.getLatestQuiz)
-			authRouter.Post("/courses/{courseID}/classes/{classID}/quiz/submit", s.submitQuiz)
-
-			// Remedial plans
-			authRouter.Get("/courses/{courseID}/classes/{classID}/remedial", s.getRemedialPlan)
-			authRouter.Post("/courses/{courseID}/classes/{classID}/remedial/generate", s.generateRemedialPlan)
-
-			authRouter.Post("/conversations", s.createConversation)
-			authRouter.Get("/conversations", s.listConversations)
-			authRouter.Get("/conversations/{conversationID}", s.getConversation)
-			authRouter.Patch("/conversations/{conversationID}", s.updateConversation)
-			authRouter.Delete("/conversations/{conversationID}", s.deleteConversation)
-			authRouter.Post("/conversations/{conversationID}/messages", s.sendMessage)
-		})
+		r.Get("/courses", s.listCourses)
+		r.Get("/courses/{courseID}", s.getCourse)
+		r.Patch("/courses/{courseID}/draft", s.updateDraft)
+		r.Post("/courses/{courseID}/regenerate", s.regenerateCourse)
+		r.Post("/courses/{courseID}/approve", s.approveCourse)
 	})
 	return router
 }
@@ -135,7 +97,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 		if origin != "" && allowed[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
 			w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
 			w.Header().Set("Access-Control-Max-Age", "600")

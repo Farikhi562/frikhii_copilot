@@ -136,7 +136,7 @@ go test ./internal/aiclient -run TestLiveAIContract -count=1 -v
 | `/`, `/privacy`, `/terms`, `/contact` | Public | Landing and legal placeholders |
 | `/login`, `/register` | Public | Supabase Auth |
 | `/forgot-password`, `/reset-password`, `/auth/callback` | Public | Recovery and email links |
-| `/app` | Authenticated | Dashboard with real goals/courses |
+| `/app` | Authenticated | Overview (real goals/courses; see `docs/APP_WORKSPACE.md`) |
 | `/app/courses` | Authenticated | Real course list and drafts |
 | `/app/courses/new` | Authenticated | Multi-step learning-goal intake |
 | `/app/goals/:goalId/diagnostic` | Authenticated | Diagnostic questions and submission |
@@ -144,7 +144,11 @@ go test ./internal/aiclient -run TestLiveAIContract -count=1 -v
 | `/app/goals/:goalId/generating` | Authenticated | Generation state with refresh polling |
 | `/app/courses/:courseId/review` | Authenticated | Edit, regenerate, approve, enroll |
 | `/app/courses/:courseId` | Authenticated | Enrolled curriculum or draft preview |
-| `/app/settings` | Authenticated | Phase 02 profile and preferences |
+| `/app/courses/:courseId/roadmap`, `/classes/:classId`, `/lessons/:lessonId` | Authenticated | Roadmap, class page, lesson workspace |
+| `/app/tutor` | Authenticated | AI Tutor UI (no backend; says so) |
+| `/app/progress`, `/app/help` | Authenticated | Learning progress (real plan data only), Help |
+| `/app/courses/demo` | Authenticated | Labelled built-in sample course |
+| `/app/settings` | Authenticated | Phase 02 profile and preferences, workspace preference |
 | `/dev/components` | Development only | UI gallery |
 
 Route guards are UX only. Authorization is enforced by the Go API (JWT + ownership) and,
@@ -173,21 +177,6 @@ All endpoints except health/readiness require `Authorization: Bearer <Supabase J
 
 Errors use `{"error":{"code","message","request_id","details?"}}`.
 
-## Deploy the backend without the laptop
-
-The frontend is deployed to GitHub Pages at `https://copilot.frikhii.my.id`. The
-Go Core API and Python AI Engine currently run on Railway:
-
-```powershell
-C:\Users\ASUS\anaconda3\python.exe scripts\set_railway_vars.py --service api
-railway up --ci --service api
-C:\Users\ASUS\anaconda3\python.exe scripts\publish_pages.py --api-url https://api-production-7064.up.railway.app
-```
-
-See `docs/DEPLOY_RAILWAY.md` for the current URL, environment variables, free-tier
-notes and troubleshooting. A Hugging Face Docker Space path is also available in
-`docs/DEPLOY_HF_SPACES.md` as a no-card alternative.
-
 ## Security notes
 
 - The browser bundle uses only the Supabase **publishable** key. `VITE_SUPABASE_ANON_KEY`
@@ -214,6 +203,7 @@ notes and troubleshooting. A Hugging Face Docker Space path is also available in
 
 - `docs/PHASE_03_AUDIT.md` — pre-implementation audit + final verification record
 - `docs/PHASE_03_IMPLEMENTATION.md` — endpoints, generation flow, validation and tests
+- `docs/APP_WORKSPACE.md` — authenticated workspace: routes, shell, real vs demo data
 - `docs/ARCHITECTURE.md` — current services, data flow and boundaries
 - `docs/DATABASE_SCHEMA.md` — Phase 02/03 tables, constraints, RLS
 - `docs/SECURITY.md` — implemented controls and residual risks

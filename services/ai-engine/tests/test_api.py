@@ -67,23 +67,3 @@ def test_invalid_request_is_rejected(goal_payload):
     )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_request"
-
-
-def test_chat_endpoint_over_http():
-    response = client.post(
-        "/internal/v1/chat",
-        json={
-            "mode": "explain",
-            "messages": [{"role": "user", "content": "What is an AI Agent?"}],
-            "context": {
-                "course_title": "AI Engineering",
-                "lesson_title": "Agent Architectures",
-            },
-        },
-        headers=HEADERS,
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["success"] is True
-    assert body["data"]["tutor_mode"] == "explain"
-    assert "FRIKHII" in body["data"]["text"]

@@ -23,7 +23,7 @@ describe("NewCourse intake", () => {
     const user = userEvent.setup({ delay: null });
     renderPage(<NewCourse />);
 
-    expect(screen.getByRole("heading", { name: "Turn a goal into a course." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What do you want to master?" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText("Use at least 3 characters.")).toBeInTheDocument();

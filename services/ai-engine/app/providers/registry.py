@@ -11,14 +11,7 @@ from app.core.errors import (
     LLMTimeoutError,
     LLMUnavailableError,
 )
-from app.providers.base import (
-    ChatRequest,
-    ChatResult,
-    LLMProvider,
-    LLMRequest,
-    ProviderResult,
-)
-from app.providers.gemini import GeminiProvider
+from app.providers.base import LLMProvider, LLMRequest, ProviderResult
 from app.providers.mock import MockProvider
 from app.providers.openai_compatible import OpenAICompatibleProvider
 
@@ -62,72 +55,52 @@ class ProviderChain:
             result.fallback_reason = type(exc).__name__
             return result
 
-    async def generate_chat(self, request: ChatRequest) -> ChatResult:
-        try:
-            return await self.primary.generate_chat(request)
-        except _ERRORS as exc:
-            if self.fallback is None:
-                raise
-            logger.warning(
-                "Primary LLM chat failed; using configured fallback provider=%s error=%s",
-                self.primary.name,
-                type(exc).__name__,
-            )
-            result = await self.fallback.generate_chat(request)
-            result.fallback_used = True
-            result.fallback_reason = type(exc).__name__
-            return result
+
+def _build_openai_compatible(
+    *,
+    name: str,
+    model: str,
+    api_key: str,
+    base_url: str,
+    settings: Settings,
+) -> LLMProvider:
+    return OpenAICompatibleProvider(
+        name=name,
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        settings=settings,
+    )
 
 
-def _build_provider_instance(name: str, settings: Settings, is_fallback: bool = False) -> LLMProvider:
-    provider_name = name.strip().lower()
-    if provider_name == "gemini":
-        model = settings.gemini_model.strip() or "gemini-2.5-flash"
-        api_key = settings.effective_api_key
-        # If API key is not present in development, handle gracefully or raise
-        return GeminiProvider(
-            model=model,
-            api_key=api_key,
-            settings=settings,
-        )
-    elif provider_name == "mock":
-        return MockProvider()
+def build_provider(settings: Settings) -> LLMProvider:
+    provider_name = settings.llm_provider.strip().lower()
+    if provider_name == "mock":
+        primary: LLMProvider = MockProvider()
     elif provider_name == "openai-compatible":
-        if is_fallback:
-            return OpenAICompatibleProvider(
-                name="openai-compatible-fallback",
-                model=settings.llm_fallback_model,
-                api_key=settings.llm_fallback_api_key,
-                base_url=settings.llm_fallback_base_url,
-                settings=settings,
-            )
-        return OpenAICompatibleProvider(
+        primary = _build_openai_compatible(
             name="openai-compatible",
             model=settings.llm_model,
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
             settings=settings,
         )
-    else:
+    else:  # pragma: no cover - Settings validates this
         raise LLMConfigurationError(f"Unsupported LLM provider: {provider_name}")
-
-
-def build_provider(settings: Settings) -> LLMProvider:
-    provider_name = settings.effective_provider
-    try:
-        primary = _build_provider_instance(provider_name, settings, is_fallback=False)
-    except LLMConfigurationError:
-        if settings.app_env in ("development", "test") and not settings.effective_api_key:
-            logger.warning("No API key configured for %s in %s environment. Falling back to MockProvider for offline dev.", provider_name, settings.app_env)
-            primary = MockProvider()
-        else:
-            raise
 
     fallback: LLMProvider | None = None
     if settings.fallback_configured:
         fallback_name = settings.llm_fallback_provider.strip().lower()
-        fallback = _build_provider_instance(fallback_name, settings, is_fallback=True)
-
+        if fallback_name == "mock":
+            fallback = MockProvider()
+        elif fallback_name == "openai-compatible":
+            fallback = _build_openai_compatible(
+                name="openai-compatible-fallback",
+                model=settings.llm_fallback_model,
+                api_key=settings.llm_fallback_api_key,
+                base_url=settings.llm_fallback_base_url,
+                settings=settings,
+            )
     return ProviderChain(primary, fallback)
 
 

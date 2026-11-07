@@ -133,3 +133,25 @@ Geist fonts were not loaded, so screenshots use a fallback sans-serif.
 **Not verified:** real fonts, Vite production build output, Lighthouse/CLS metrics,
 real-browser rendering of the Vite-built page, screen-reader behaviour, Safari/Firefox,
 and the real login flow against Supabase (auth code is unchanged).
+
+## Authenticated workspace
+
+**Not run** (no network, dependencies not installable): `npm run typecheck`, `npm run lint`,
+`npm run build`, `npm test`, `go test`, `pytest`. New vitest file
+`features/workspace/workspace.test.ts` is written but unexecuted; `NewCourse.test.tsx` was
+updated for the new heading and is also unexecuted.
+
+**Run, in headless Chromium** against an esbuild bundle of the real workspace pages with
+Tailwind 4.3.3 compiled from the project CSS. `react-router`, TanStack Query, zustand, Radix,
+react-hook-form, Supabase and lucide were replaced by small stubs (icons render as dashes),
+the API was mocked with `page.route`, and Geist fonts were not loaded. 89 of 89 browser checks passed:
+
+- Dashboard, library, course overview, roadmap, class, lesson, tutor, progress, settings, help, search, account menu.
+- Every sidebar and secondary nav link navigates and marks the active item; collapse persists across reload.
+- Library search and filters; accordions and tabs; tutor mode selection, composer, send shows an honest error, scripted preview labelled.
+- Empty account, API 500 with retry recovery, unknown class/lesson not-found states, demo banner.
+- No horizontal overflow on 11 routes at 360, 390, 768, 1024 and 1440 px; no console errors.
+- Defects found and fixed: tab list and tutor mode picker overflowed on narrow screens.
+
+**Not verified:** real routing/Query/Radix behaviour, the Vite build, fonts and icons, real Supabase
+login (auth code unchanged), screen readers, Safari/Firefox, and anything needing a live backend.

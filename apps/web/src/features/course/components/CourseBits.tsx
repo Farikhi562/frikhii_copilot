@@ -67,7 +67,8 @@ export function CourseCard({ course }: { course: CourseSummary }) {
       </dl>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-ink/55">
-          {Math.round(course.estimated_duration_minutes / 60)}h total · {course.target_learner_level}
+          {Math.round(course.estimated_duration_minutes / 60)}h total · {course.target_learner_level} · updated{" "}
+          {new Date(course.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
         </span>
         {hasDraft ? (
           <Link

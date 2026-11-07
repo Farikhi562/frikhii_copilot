@@ -89,10 +89,11 @@ export default function NewCourse() {
     <div className="space-y-8">
       <div>
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/50">AI Course Architect</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">Turn a goal into a course.</h1>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight">What do you want to master?</h1>
         <p className="mt-3 max-w-2xl text-ink/65">
-          Tell us what you want to achieve. A short diagnostic checks your starting point, then the
-          architect drafts a curriculum you can review before anything is enrolled.
+          Start with an ambition. FRIKHII Copilot will help turn it into a structured learning
+          journey: a short diagnostic checks your starting point, then the architect drafts a
+          curriculum you review before anything is enrolled.
         </p>
       </div>
 

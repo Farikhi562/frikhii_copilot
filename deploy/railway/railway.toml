@@ -1,0 +1,11 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "deploy/railway/Dockerfile"
+# Build context is the repo root so COPY services/... paths resolve.
+dockerContextDir = "."
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

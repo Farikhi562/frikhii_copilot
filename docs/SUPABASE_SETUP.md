@@ -141,14 +141,9 @@ The canonical migrations stay in `database/migrations/`; copy them for the CLI.
 1. **Table Editor** → confirm the Phase 02 tables (`public.profiles`,
    `public.user_preferences`) and the Phase 03 learning tables exist; all show RLS enabled.
 2. Run `database/tests/rls_phase_02.sql` in the SQL Editor after replacing `USER_A` /
-   `USER_B` with two real user ids. Find them with
-   `select id, email from auth.users order by created_at;`. The script checks grants as
-   postgres, impersonates USER_A for row-level checks, and rolls itself back. It is
-   non-aborting; expected results appear next to each query (the expected insert failure
-   appears as a NOTICE).
+   `USER_B` with two real user ids and reading the expected results in the file.
 3. Complete a goal and course for those users, then run `database/tests/rls_phase_03.sql`
-   the same way. It uses the same non-aborting approach and checks the private answer-key
-   table with `has_table_privilege` instead of triggering a permission error.
+   the same way.
 4. The scripts roll themselves back; they do not change data.
 
 Expected highlights:

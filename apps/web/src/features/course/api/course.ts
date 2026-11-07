@@ -12,9 +12,7 @@ import {
 } from "../schemas/course";
 import type { CreateLearningGoalRequest } from "../schemas/intake";
 
-const runtimeBaseURL =
-  typeof window === "undefined" ? undefined : window.FRIKHII_CONFIG?.coreApiUrl?.trim();
-const rawBaseURL = runtimeBaseURL || import.meta.env.VITE_CORE_API_URL?.trim();
+const rawBaseURL = import.meta.env.VITE_CORE_API_URL?.trim();
 export const coreAPIBaseURL = (rawBaseURL || "http://localhost:8080").replace(/\/+$/, "");
 export const coreAPIConfigError =
   !rawBaseURL && import.meta.env.PROD
@@ -75,7 +73,7 @@ function requestId(): string {
 }
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PATCH";
   body?: unknown;
   timeoutMs?: number;
 };

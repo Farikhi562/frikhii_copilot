@@ -31,9 +31,7 @@ describe("router without Supabase configuration", () => {
 
   it("lazy-loads login and explains the missing configuration", async () => {
     renderRoute("/login");
-    expect(
-      await screen.findByRole("heading", { name: "Welcome back." }, { timeout: 5000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Welcome back." })).toBeInTheDocument();
     expect(screen.getByText("Authentication is not connected yet")).toBeInTheDocument();
   });
 

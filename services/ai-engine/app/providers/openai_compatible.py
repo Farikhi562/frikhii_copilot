@@ -16,14 +16,7 @@ from app.core.errors import (
     LLMTimeoutError,
     LLMUnavailableError,
 )
-from app.providers.base import (
-    ChatRequest,
-    ChatResult,
-    LLMProvider,
-    LLMRequest,
-    ProviderResult,
-    extract_json_object,
-)
+from app.providers.base import LLMProvider, LLMRequest, ProviderResult, extract_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -159,40 +152,6 @@ class OpenAICompatibleProvider(LLMProvider):
             )
 
         raise LLMUnavailableError() from last_error
-
-    async def generate_chat(self, request: ChatRequest) -> ChatResult:
-        messages = [{"role": "system", "content": request.system_instruction}]
-        for m in request.messages:
-            messages.append({"role": m.role, "content": m.content})
-
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": request.temperature,
-            "max_tokens": request.max_output_tokens,
-        }
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
-        started = time.perf_counter()
-        async with httpx.AsyncClient(timeout=request.timeout_seconds, transport=self._transport) as client:
-            resp = await client.post(f"{self._base_url}/chat/completions", headers=headers, json=payload)
-            duration_ms = int((time.perf_counter() - started) * 1000)
-            if resp.status_code != 200:
-                raise LLMResponseError(f"Provider rejected chat request (HTTP {resp.status_code}).")
-            body = resp.json()
-            choice = body["choices"][0]
-            text = choice["message"]["content"]
-            usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
-            return ChatResult(
-                text=text,
-                provider=self.name,
-                model=self.model,
-                duration_ms=duration_ms,
-                usage=usage,
-                finish_reason=choice.get("finish_reason"),
-            )
 
     async def _sleep(self, attempt: int) -> None:
         base = min(8.0, 0.8 * (2**attempt))

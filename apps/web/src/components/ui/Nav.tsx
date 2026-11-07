@@ -16,6 +16,6 @@ export const Breadcrumb = ({ items }: { items: { label: string; to?: string }[] 
     <li key={c.label} className="flex items-center gap-1">{c.to && i < items.length - 1 ? <Link to={c.to} className="text-ink/65 hover:underline">{c.label}</Link> : <span aria-current="page">{c.label}</span>}{i < items.length - 1 && <ChevronRight className="h-4 w-4" aria-hidden />}</li>))}</ol></nav>);
 export function Tabs({ tabs, value, onValueChange }: { tabs: { value: string; label: string; content: ReactNode }[]; value?: string; onValueChange?: (v: string) => void }) {
   return (<TB.Root value={value} onValueChange={onValueChange} defaultValue={value === undefined ? tabs[0]?.value : undefined}>
-    <TB.List className="flex gap-1 border-b border-ink/15">{tabs.map((t) => <TB.Trigger key={t.value} value={t.value} className="px-4 py-2 data-[state=active]:border-b-2 data-[state=active]:border-blue">{t.label}</TB.Trigger>)}</TB.List>
+    <TB.List className="flex gap-1 overflow-x-auto border-b border-ink/15">{tabs.map((t) => <TB.Trigger key={t.value} value={t.value} className="shrink-0 whitespace-nowrap px-4 py-2 data-[state=active]:border-b-2 data-[state=active]:border-blue">{t.label}</TB.Trigger>)}</TB.List>
     {tabs.map((t) => <TB.Content key={t.value} value={t.value} className="pt-4">{t.content}</TB.Content>)}</TB.Root>);
 }

@@ -27,17 +27,6 @@ type Question struct {
 	Explanation string
 }
 
-// QuizQuestion is the store-level input type for creating quiz attempts.
-type QuizQuestion struct {
-	SourceID   string
-	Sequence   int
-	Type       string
-	Prompt     string
-	Competency string
-	Difficulty string
-	Choices    []domain.Choice
-}
-
 type Store interface {
 	Ping(ctx context.Context) error
 
@@ -58,33 +47,4 @@ type Store interface {
 	ListCourses(ctx context.Context, userID string) ([]domain.CourseSummary, error)
 	UpdateDraft(ctx context.Context, userID, courseID string, patch domain.UpdateDraftInput) (*domain.CourseDetail, error)
 	ApproveCourse(ctx context.Context, userID, courseID, versionID string) (*domain.CourseDetail, error)
-
-	CreateConversation(ctx context.Context, userID string, input domain.CreateConversationInput) (*domain.Conversation, error)
-	ListConversations(ctx context.Context, userID string) ([]domain.Conversation, error)
-	GetConversation(ctx context.Context, userID, conversationID string) (*domain.ConversationDetail, error)
-	UpdateConversation(ctx context.Context, userID, conversationID string, input domain.UpdateConversationInput) (*domain.Conversation, error)
-	DeleteConversation(ctx context.Context, userID, conversationID string) error
-	AddMessage(ctx context.Context, userID, conversationID string, role, content, model string, tokenUsage, metadata map[string]any) (*domain.Message, error)
-
-	CompleteLesson(ctx context.Context, userID, courseID, lessonID string) error
-	GetCompletedLessons(ctx context.Context, userID, courseID string) ([]string, error)
-
-	// Learning Engine — lesson, exercise, quiz, remedial
-	GetLesson(ctx context.Context, userID, courseID, lessonID string) (*domain.LessonWithContents, error)
-	SaveLessonAuthored(ctx context.Context, userID, courseID, lessonID string, authored any) error
-	GetExercise(ctx context.Context, userID, courseID, classID string) (*domain.ExerciseWithAuthored, error)
-	SaveExerciseAuthored(ctx context.Context, userID, courseID, exerciseID string, authored any) error
-	SubmitExercise(ctx context.Context, userID, courseID, exerciseID, response string) (*domain.ExerciseSubmission, error)
-	GetRoadmap(ctx context.Context, userID, courseID string) (*domain.Roadmap, error)
-	GetLatestRemedialPlan(ctx context.Context, userID, courseID, classID string) (*domain.RemedialPlanRecord, error)
-	CreateRemedialPlan(ctx context.Context, userID, courseID, classID, quizAttemptID string, plan any) (*domain.RemedialPlanRecord, error)
-
-	CreateQuizAttempt(ctx context.Context, userID, courseID, classID string, passingScore int, questions []QuizQuestion, keys []domain.QuizAnswerKey) (*domain.QuizAttempt, error)
-	GetLatestQuiz(ctx context.Context, userID, courseID, classID string) (*domain.QuizAttempt, error)
-	GetQuizForEvaluation(ctx context.Context, userID, attemptID string) (*domain.QuizAttempt, []domain.QuizAnswerKey, error)
-	SaveQuizEvaluation(ctx context.Context, userID, attemptID string, answers []domain.QuizAnswer, evaluation domain.QuizEvaluation) (*domain.QuizAttempt, error)
-	ListLatestQuizzes(ctx context.Context, userID, courseID string) ([]domain.QuizAttempt, error)
-
-	GetDashboard(ctx context.Context, userID string) (*domain.DashboardData, error)
-	GetProgress(ctx context.Context, userID string) (*domain.ProgressData, error)
 }

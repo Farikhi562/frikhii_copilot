@@ -22,6 +22,12 @@ const DiagnosticResult = lazy(() => import("../pages/app/DiagnosticResult"));
 const Generating = lazy(() => import("../pages/app/Generating"));
 const CourseReview = lazy(() => import("../pages/app/CourseReview"));
 const CourseDetail = lazy(() => import("../pages/app/CourseDetail"));
+const CourseRoadmap = lazy(() => import("../pages/app/CourseRoadmap"));
+const ClassPage = lazy(() => import("../pages/app/ClassPage"));
+const LessonPage = lazy(() => import("../pages/app/LessonPage"));
+const Tutor = lazy(() => import("../pages/app/Tutor"));
+const Progress = lazy(() => import("../pages/app/Progress"));
+const Help = lazy(() => import("../pages/app/Help"));
 const AppSettings = lazy(() => import("../pages/app/Settings"));
 const ComponentGallery = lazy(() => import("../pages/ComponentGallery"));
 
@@ -49,6 +55,12 @@ export function AppRoutes() {
           <Route path="courses/new" element={<NewCourse />} />
           <Route path="courses/:courseId" element={<CourseDetail />} />
           <Route path="courses/:courseId/review" element={<CourseReview />} />
+          <Route path="courses/:courseId/roadmap" element={<CourseRoadmap />} />
+          <Route path="courses/:courseId/classes/:classId" element={<ClassPage />} />
+          <Route path="courses/:courseId/lessons/:lessonId" element={<LessonPage />} />
+          <Route path="tutor" element={<Tutor />} />
+          <Route path="progress" element={<Progress />} />
+          <Route path="help" element={<Help />} />
           <Route path="goals/:goalId/diagnostic" element={<Diagnostic />} />
           <Route path="goals/:goalId/result" element={<DiagnosticResult />} />
           <Route path="goals/:goalId/generating" element={<Generating />} />

@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:pages": "npm run build && node scripts/prepare-pages.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint .",

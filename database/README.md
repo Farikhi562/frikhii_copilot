@@ -24,14 +24,6 @@ The canonical copy lives in this folder. Supabase CLI users can copy each file i
 `supabase/migrations/` before running `supabase db push`; the Supabase SQL Editor can
 also run the file directly. See `docs/SUPABASE_SETUP.md`.
 
-## RLS test scripts
-
-`database/tests/rls_phase_02.sql` and `rls_phase_03.sql` are run manually as postgres.
-Replace `USER_A` and `USER_B` with real UUIDs first (find them with
-`select id, email from auth.users order by created_at;`). They check grants with
-`has_table_privilege`, impersonate USER_A for row-level checks, catch the one expected
-insert failure in a `DO` block, and roll back. They are non-aborting so every check runs.
-
 ## Rules
 
 - Every user-owned table has RLS enabled.

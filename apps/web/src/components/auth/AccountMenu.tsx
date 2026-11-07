@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { LifeBuoy, LogOut, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar } from "../ui/Form";
 
@@ -47,9 +47,9 @@ export function AccountMenu({
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
-            <Link to="/app" className={itemClass}>
-              <UserRound className="h-4 w-4" aria-hidden />
-              Dashboard
+            <Link to="/app/help" className={itemClass}>
+              <LifeBuoy className="h-4 w-4" aria-hidden />
+              Help &amp; support
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item

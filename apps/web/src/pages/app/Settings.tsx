@@ -10,6 +10,8 @@ import { AppearanceForm, LearningPreferencesForm } from "../../features/profile/
 import { ProfileForm } from "../../features/profile/components/ProfileForm";
 import { usePreferences, useProfile } from "../../features/profile/hooks/useProfile";
 import { errorMessage } from "../../lib/errors";
+import { Switch } from "../../components/ui/Form";
+import { useShellStore } from "../../features/workspace/shell/shellStore";
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -19,6 +21,8 @@ export default function Settings() {
   // must exist before the user_preferences FK can accept its row.
   const preferencesQuery = usePreferences(profileQuery.data ? (user?.id ?? null) : null);
 
+  const sidebarCollapsed = useShellStore((st) => st.collapsed);
+  const setSidebarCollapsed = useShellStore((st) => st.setCollapsed);
   const [signingOut, setSigningOut] = useState(false);
   const [resetState, setResetState] = useState<"idle" | "sending" | "sent">("idle");
   const [resetError, setResetError] = useState<string | null>(null);
@@ -61,10 +65,10 @@ export default function Settings() {
   );
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl space-y-8" id="settings-top">
       <SectionHeader
         title="Settings"
-        description="Your profile, learning preferences and account. Everything here is saved to Supabase."
+        description="Your profile, learning preferences and account are saved to your account. Workspace behavior is saved on this device only."
       />
 
       {profileQuery.isLoading ? (
@@ -101,6 +105,14 @@ export default function Settings() {
           <AppearanceForm preferences={preferencesQuery.data} userId={user.id} />
         </>
       ) : null}
+
+      <Card className="space-y-3">
+        <div>
+          <h2 className="font-semibold">Workspace</h2>
+          <p className="mt-1 text-sm text-ink/65">Saved on this device only, not to your account.</p>
+        </div>
+        <Switch checked={sidebarCollapsed} onCheckedChange={setSidebarCollapsed} label="Keep the sidebar collapsed" />
+      </Card>
 
       <Card className="space-y-5">
         <div>

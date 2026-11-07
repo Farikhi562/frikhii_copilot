@@ -31,40 +31,11 @@ class ProviderResult:
     fallback_reason: str | None = None
 
 
-@dataclass
-class ChatTurn:
-    role: str  # "user" | "assistant" | "system"
-    content: str
-
-
-@dataclass
-class ChatRequest:
-    system_instruction: str
-    messages: list[ChatTurn]
-    temperature: float
-    max_output_tokens: int
-    timeout_seconds: float
-
-
-@dataclass
-class ChatResult:
-    text: str
-    provider: str
-    model: str
-    duration_ms: int
-    usage: dict[str, Any] = field(default_factory=dict)
-    finish_reason: str | None = None
-    fallback_used: bool = False
-    fallback_reason: str | None = None
-
-
 class LLMProvider(Protocol):
     name: str
     model: str
 
     async def generate_json(self, request: LLMRequest) -> ProviderResult: ...
-
-    async def generate_chat(self, request: ChatRequest) -> ChatResult: ...
 
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
