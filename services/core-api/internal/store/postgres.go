@@ -61,6 +61,26 @@ func marshalJSON(value any) []byte {
 	return data
 }
 
+// jsonbObject marshals value for a jsonb object column. A nil map/slice/pointer
+// marshals to JSON null, which violates the schema's jsonb_typeof(...)='object'
+// checks (e.g. messages_metadata_check), so it falls back to an empty object.
+func jsonbObject(value any) []byte {
+	data, _ := json.Marshal(value)
+	if len(data) == 0 || string(data) == "null" {
+		return []byte("{}")
+	}
+	return data
+}
+
+// jsonbArray is the array-column counterpart of jsonbObject.
+func jsonbArray(value any) []byte {
+	data, _ := json.Marshal(value)
+	if len(data) == 0 || string(data) == "null" {
+		return []byte("[]")
+	}
+	return data
+}
+
 func (p *Postgres) CreateLearningGoal(ctx context.Context, userID string, input domain.CreateLearningGoalInput) (*domain.LearningGoal, error) {
 	var goal domain.LearningGoal
 	goal.UserID = userID
@@ -76,8 +96,8 @@ func (p *Postgres) CreateLearningGoal(ctx context.Context, userID string, input 
 			learning_preferences, coalesce(to_char(target_date, 'YYYY-MM-DD'), ''), status, last_error,
 			created_at, updated_at`,
 		userID, input.Title, input.GoalStatement, input.IntendedOutcome, input.Motivation,
-		input.AdditionalContext, input.SelfReportedLevel, marshalJSON(input.CurrentKnowledge),
-		input.WeeklyStudyMinutes, input.LearningLanguage, marshalJSON(input.LearningPreferences),
+		input.AdditionalContext, input.SelfReportedLevel, jsonbObject(input.CurrentKnowledge),
+		input.WeeklyStudyMinutes, input.LearningLanguage, jsonbObject(input.LearningPreferences),
 		input.TargetDate,
 	).Scan(
 		&goal.ID, &goal.Title, &goal.GoalStatement, &goal.IntendedOutcome, &goal.Motivation,
@@ -1509,8 +1529,9 @@ func (p *Postgres) DeleteConversation(ctx context.Context, userID, conversationI
 }
 
 func (p *Postgres) AddMessage(ctx context.Context, userID, conversationID string, role, content, model string, tokenUsage, metadata map[string]any) (*domain.Message, error) {
+	// token_usage may be NULL; metadata must be a JSON object (messages_metadata_check).
 	tokenUsageJSON, _ := json.Marshal(tokenUsage)
-	metadataJSON, _ := json.Marshal(metadata)
+	metadataJSON := jsonbObject(metadata)
 
 	var msg domain.Message
 	var tokenUsageBytes, metadataBytes []byte
@@ -2191,8 +2212,8 @@ func (p *Postgres) SaveQuizEvaluation(ctx context.Context, userID, attemptID str
 			submitted_at=coalesce(submitted_at,now()), evaluated_at=now()
 		where id=$7 and user_id=$8`,
 		evaluation.Score, evaluation.Passed, evaluation.Summary,
-		marshalJSON(evaluation.Strengths), marshalJSON(evaluation.Gaps),
-		marshalJSON(evaluation.QuestionScores),
+		jsonbArray(evaluation.Strengths), jsonbArray(evaluation.Gaps),
+		jsonbArray(evaluation.QuestionScores),
 		attemptID, userID,
 	); err != nil {
 		return nil, err
@@ -2266,10 +2287,8 @@ func (p *Postgres) GetLatestRemedialPlan(ctx context.Context, userID, courseID, 
 }
 
 func (p *Postgres) CreateRemedialPlan(ctx context.Context, userID, courseID, classID, quizAttemptID string, plan any) (*domain.RemedialPlanRecord, error) {
-	data, err := json.Marshal(plan)
-	if err != nil {
-		return nil, err
-	}
+	// plan must be a JSON object (remedial_plans_plan_check).
+	data := jsonbObject(plan)
 	type remedialPlanData struct {
 		GapSummary string `json:"gap_summary"`
 	}
@@ -2292,7 +2311,7 @@ func (p *Postgres) CreateRemedialPlan(ctx context.Context, userID, courseID, cla
 	if quizAttemptID != "" {
 		qaidPtr = &quizAttemptID
 	}
-	err = p.pool.QueryRow(ctx, `
+	err := p.pool.QueryRow(ctx, `
 		insert into public.remedial_plans
 			(course_id, class_id, quiz_attempt_id, user_id, status, gap_summary, plan)
 		values ($1,$2,$3::uuid,$4,'active',$5,$6)
