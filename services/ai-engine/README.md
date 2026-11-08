@@ -1,4 +1,4 @@
-# FRIKHII Copilot — AI Engine (Python + FastAPI)
+﻿# FRIKHII Copilot â€” AI Engine (Python + FastAPI)
 
 Provider-independent generation service for Phase 03 diagnostics and curriculum
 blueprints. It returns structured JSON only; it never writes courses or reads other users'
@@ -6,7 +6,7 @@ data.
 
 ## Responsibilities
 
-- Generate a 5–8 question diagnostic with private answer keys.
+- Generate a 5â€“8 question diagnostic with private answer keys.
 - Evaluate learner answers into level, strengths, gaps, misconceptions and feedback.
 - Generate a complete course blueprint (modules, classes, lessons, exercises, final
   project/assessment).
@@ -47,10 +47,10 @@ Core API.
 
 `LLM_PROVIDER` accepts:
 
-- `openai-compatible` — the real adapter; works with OpenAI and compatible gateways
+- `openai-compatible` â€” the real adapter; works with OpenAI and compatible gateways
   (OpenRouter, Groq, Together, vLLM, Ollama, Google's compatible endpoint, etc.).
   Configure `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`.
-- `mock` — deterministic fixture output. Allowed only when `APP_ENV` is not `production`;
+- `mock` â€” deterministic fixture output. Allowed only when `APP_ENV` is not `production`;
   the response metadata and UI disclose it.
 
 `LLM_STRUCTURED_OUTPUT` selects `json_object` (broad compatibility) or `json_schema`

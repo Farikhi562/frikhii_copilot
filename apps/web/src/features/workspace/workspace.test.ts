@@ -18,11 +18,13 @@ import { deriveTargetedCompetencies } from "./progress/derive";
 import { TutorUnavailableError, tutorModes, tutorService } from "./tutor/tutor";
 import { useShellStore } from "./shell/shellStore";
 
+const version = demoCourse.version as NonNullable<typeof demoCourse.version>;
+
 describe("demo course", () => {
   it("matches the real CourseDetail schema and is clearly marked as a demo", () => {
     expect(courseDetailSchema.safeParse(demoCourse).success).toBe(true);
     expect(demoCourse.id).toBe(DEMO_COURSE_ID);
-    expect(demoCourse.version.title.toLowerCase()).toContain("sample");
+    expect(version.title.toLowerCase()).toContain("sample");
   });
   it("has a rich lesson with several block types", () => {
     expect(new Set(demoRichLesson.map((b) => b.type)).size).toBeGreaterThan(4);
@@ -30,7 +32,6 @@ describe("demo course", () => {
 });
 
 describe("course view helpers", () => {
-  const version = demoCourse.version;
   it("flattens classes and lessons in order", () => {
     const classes = flattenClasses(version);
     expect(classes).toHaveLength(6);
@@ -56,7 +57,7 @@ describe("course view helpers", () => {
 
 describe("lesson blocks", () => {
   it("renders a blueprint lesson as blocks without inventing prose", () => {
-    const lesson = flattenLessons(demoCourse.version)[0].lesson;
+    const lesson = flattenLessons(version)[0].lesson;
     const blocks = blueprintToBlocks(lesson);
     expect(blocks.length).toBeGreaterThan(0);
     expect(wordCount(blocks)).toBeGreaterThan(0);
@@ -66,7 +67,7 @@ describe("lesson blocks", () => {
 describe("progress derivation", () => {
   it("lists competencies actually targeted by the course", () => {
     const list = deriveTargetedCompetencies([demoCourse]);
-    expect(list.length).toBe(demoCourse.version.target_competencies.length);
+    expect(list.length).toBe(version.target_competencies.length);
   });
 });
 

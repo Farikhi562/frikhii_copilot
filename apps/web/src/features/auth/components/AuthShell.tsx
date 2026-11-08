@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Mark } from "../../../components/brand/Mark";
+import { LanguageToggle } from "../../../components/ui/LanguageToggle";
 
 /**
  * Split editorial layout shared by every auth screen. Deliberately light on
@@ -44,14 +45,20 @@ export function AuthShell({
         </p>
       </section>
 
-      <section className="flex min-h-screen flex-col px-6 py-8 sm:px-10 lg:px-16">
+      <section className="relative flex min-h-screen flex-col px-6 py-8 sm:px-10 lg:px-16">
+        <div className="absolute right-6 top-8 hidden sm:block lg:right-16">
+          <LanguageToggle />
+        </div>
         <div className="flex items-center justify-between lg:hidden">
           <Link to="/" aria-label="FRIKHII home">
             <Mark />
           </Link>
-          <Link to="/" className="text-sm text-ink/65 hover:underline">
-            Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
+            <Link to="/" className="text-sm text-ink/65 hover:underline">
+              Home
+            </Link>
+          </div>
         </div>
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">

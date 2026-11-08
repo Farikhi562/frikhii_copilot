@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.providers.base import LLMProvider, LLMRequest, ProviderResult
+from app.providers.base import ChatRequest, ChatResult, LLMProvider, LLMRequest, ProviderResult
 
 
 class MockProvider(LLMProvider):
@@ -33,6 +33,25 @@ class MockProvider(LLMProvider):
             model=self.model,
             duration_ms=int((time.perf_counter() - started) * 1000),
             usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        )
+
+    async def generate_chat(self, request: ChatRequest) -> ChatResult:
+        started = time.perf_counter()
+        last_msg = request.messages[-1].content if request.messages else "Halo"
+        reply = (
+            f"[FRIKHII AI Tutor]\n\n"
+            f"Saya memahami pertanyaan Anda: \"{last_msg}\".\n\n"
+            "Mari kita pelajari konsep ini dengan alur FRIKHII:\n"
+            "UNDERSTAND → EXPLAIN → PRACTICE → EVALUATE → MASTER.\n\n"
+            "Sebagai langkah awal, apa inti utama yang sudah Anda pahami sejauh ini?"
+        )
+        return ChatResult(
+            text=reply,
+            provider=self.name,
+            model=self.model,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            usage={"input_tokens": 15, "output_tokens": 45, "total_tokens": 60},
+            finish_reason="stop",
         )
 
     @staticmethod
