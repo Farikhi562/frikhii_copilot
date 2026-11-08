@@ -843,14 +843,12 @@ class MockProvider(LLMProvider):
             )
         )
         return {
-            "evaluation": {
-                "score": max(0, min(100, average)),
-                "passed": passed,
-                "summary": summary,
-                "strengths": strengths,
-                "gaps": gaps,
-                "question_scores": scores,
-            }
+            "score": max(0, min(100, average)),
+            "passed": passed,
+            "summary": summary,
+            "strengths": strengths,
+            "gaps": gaps,
+            "question_scores": scores,
         }
 
     def _exercise(self, payload: dict[str, Any]) -> dict[str, Any]:

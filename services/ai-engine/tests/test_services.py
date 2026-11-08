@@ -9,8 +9,22 @@ from app.core.errors import ContentValidationError
 from app.providers.mock import MockProvider
 from app.schemas.curriculum import CurriculumGenerateRequest
 from app.schemas.diagnostic import DiagnosticGenerateRequest
+from app.schemas.learning import (
+    ExerciseGenerateRequest,
+    LessonGenerateRequest,
+    QuizEvaluateRequest,
+    QuizGenerateRequest,
+    RemedialGenerateRequest,
+)
 from app.services.curriculum_service import generate_curriculum
 from app.services.diagnostic_service import evaluate_diagnostic, generate_diagnostic
+from app.services.learning_service import (
+    evaluate_quiz,
+    generate_exercise,
+    generate_lesson,
+    generate_quiz,
+    generate_remedial,
+)
 
 
 def settings() -> Settings:
@@ -127,3 +141,108 @@ def test_diagnostic_evaluation_rejects_duplicate_answers(goal_payload):
     )
     with pytest.raises(ContentValidationError):
         asyncio.run(evaluate_diagnostic(request, provider=provider, settings=settings()))
+
+
+def test_learning_engine_mock_end_to_end():
+    provider = MockProvider()
+    cfg = settings()
+
+    lesson = asyncio.run(
+        generate_lesson(
+            LessonGenerateRequest(
+                lesson_id="lesson-1",
+                title="Variables and state",
+                description="Understand how values are stored and changed in a program.",
+                blueprint={"summary": "blueprint body"},
+                course_title="Python Foundations",
+                class_title="State basics",
+            ),
+            provider=provider,
+            settings=cfg,
+        )
+    )
+    assert lesson.lesson.lesson_id == "lesson-1"
+    assert len(lesson.lesson.sections) >= 4
+
+    quiz = asyncio.run(
+        generate_quiz(
+            QuizGenerateRequest(
+                class_id="class-1",
+                class_title="State basics",
+                class_description="Learn how state changes across a program run.",
+                competencies=["Applied understanding"],
+                knowledge_check_description="Verify the learner can apply state changes unaided.",
+                question_count=5,
+                course_title="Python Foundations",
+            ),
+            provider=provider,
+            settings=cfg,
+        )
+    )
+    assert len(quiz.questions) == 5
+    assert quiz.passing_score == 80
+
+    answers = [
+        {
+            "question_id": q.id,
+            "response": "a"
+            if q.type == "multiple_choice"
+            else "The value is stored in a variable and reassigned, with a concrete example.",
+        }
+        for q in quiz.questions
+    ]
+    evaluation = asyncio.run(
+        evaluate_quiz(
+            QuizEvaluateRequest(
+                class_id="class-1",
+                class_title="State basics",
+                questions=quiz.questions,
+                answer_keys=quiz.answer_keys,
+                answers=answers,
+                passing_score=quiz.passing_score,
+            ),
+            provider=provider,
+            settings=cfg,
+        )
+    ).evaluation
+    scored = {s.question_id for s in evaluation.question_scores}
+    assert scored == {q.id for q in quiz.questions}
+    assert evaluation.passed == (evaluation.score >= quiz.passing_score)
+
+    exercise = asyncio.run(
+        generate_exercise(
+            ExerciseGenerateRequest(
+                class_id="class-1",
+                class_title="State basics",
+                exercise_title="Build a counter",
+                exercise_description="Apply state changes by building a small counter.",
+                difficulty="foundation",
+                competency="Applied understanding",
+                course_title="Python Foundations",
+            ),
+            provider=provider,
+            settings=cfg,
+        )
+    )
+    assert len(exercise.exercise.steps) >= 2
+
+    plan = asyncio.run(
+        generate_remedial(
+            RemedialGenerateRequest(
+                class_id="class-1",
+                class_title="State basics",
+                course_title="Python Foundations",
+                quiz_score=45,
+                passing_score=80,
+                gaps=[{
+                    "competency": "Applied understanding",
+                    "description": "Answers recognise state but do not predict changes.",
+                    "severity": "medium",
+                    "recommendation": "Re-read the explanation, then complete one unaided task.",
+                }],
+            ),
+            provider=provider,
+            settings=cfg,
+        )
+    ).plan
+    assert len(plan.activities) >= 2
