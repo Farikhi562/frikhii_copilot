@@ -75,9 +75,11 @@ export default function Tutor() {
       {isDemo && <DemoBanner />}
       <PageHeader eyebrow="AI Tutor" title="Let's work through what you're learning." description="Choose how you want to learn, then ask." />
 
-      <Alert variant="warning" title="The AI Tutor is not connected yet">
-        You can explore the workspace and type messages, but there is no AI backend, so nothing will answer. Any example conversation is labelled as a scripted preview.
-      </Alert>
+      {!tutorService.available && (
+        <Alert variant="warning" title="The AI Tutor is not connected yet">
+          You can explore the workspace and type messages, but there is no AI backend, so nothing will answer. Any example conversation is labelled as a scripted preview.
+        </Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_16rem]">
         {/* Modes */}

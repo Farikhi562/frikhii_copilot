@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { courseDetailSchema } from "../course/schemas/course";
 import { demoCourse, DEMO_COURSE_ID } from "./demo/demoCourse";
 import { demoRichLesson } from "./demo/demoLesson";
@@ -15,8 +15,23 @@ import {
 } from "./courseView";
 import { blueprintToBlocks, wordCount } from "./lessonBlocks";
 import { deriveTargetedCompetencies } from "./progress/derive";
-import { TutorUnavailableError, tutorModes, tutorService } from "./tutor/tutor";
+import { tutorModes, tutorService } from "./tutor/tutor";
 import { useShellStore } from "./shell/shellStore";
+
+// The tutor talks to the Core API with a Supabase bearer token; tests run without
+// Supabase configuration, so provide a stub session for the wiring test below.
+vi.mock("../../lib/supabase", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/supabase")>();
+  return {
+    ...actual,
+    requireSupabase: () =>
+      ({
+        auth: {
+          getSession: async () => ({ data: { session: { access_token: "test-token" } }, error: null }),
+        },
+      }) as unknown as ReturnType<typeof actual.requireSupabase>,
+  };
+});
 
 const version = demoCourse.version as NonNullable<typeof demoCourse.version>;
 
@@ -72,12 +87,59 @@ describe("progress derivation", () => {
 });
 
 describe("AI tutor", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("offers six modes", () => expect(tutorModes).toHaveLength(6));
-  it("never fabricates an answer while no backend exists", async () => {
-    expect(tutorService.available).toBe(false);
-    await expect(tutorService.send({ mode: "explain", message: "hi", context: {} })).rejects.toBeInstanceOf(
-      TutorUnavailableError,
+
+  it("creates a conversation and shows the reply produced by the engine", async () => {
+    const calls: Array<{ method: string; url: string; body: Record<string, unknown> | undefined }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        let payload: unknown;
+        let status = 200;
+        if (method === "GET" && url.endsWith("/api/v1/conversations")) {
+          payload = { conversations: [] };
+        } else if (method === "POST" && url.endsWith("/api/v1/conversations")) {
+          status = 201;
+          payload = { conversation: { id: "conv-1", title: "Explain tutor", tutor_mode: "explain" } };
+        } else if (method === "POST" && url.includes("/conversations/conv-1/messages")) {
+          payload = {
+            user_message: { id: "m-1" },
+            assistant_message: { id: "m-2", content: "A reply produced by the engine." },
+          };
+        } else {
+          throw new Error(`unexpected request: ${method} ${url}`);
+        }
+        calls.push({ method, url, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined });
+        return new Response(JSON.stringify(payload), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
     );
+
+    const result = await tutorService.send({
+      mode: "explain",
+      message: "What is a goroutine?",
+      context: { courseTitle: "Go Foundations" },
+    });
+
+    // The reply text comes verbatim from the API response, never from the client.
+    expect(result.text).toBe("A reply produced by the engine.");
+    expect(calls.map((c) => `${c.method} ${new URL(c.url).pathname}`)).toEqual([
+      "GET /api/v1/conversations",
+      "POST /api/v1/conversations",
+      "POST /api/v1/conversations/conv-1/messages",
+    ]);
+    expect(calls[1].body).toMatchObject({ tutor_mode: "explain" });
+    expect(calls[1].body?.title).toEqual(expect.stringContaining("Explain"));
+    expect(calls[2].body).toEqual({
+      content: "What is a goroutine?",
+      context: { course_title: "Go Foundations" },
+    });
   });
 });
 

@@ -738,6 +738,10 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		Role:    "user",
 		Content: content,
 	})
+	// The AI Engine accepts at most 50 messages; keep the most recent window.
+	if len(chatMessages) > 50 {
+		chatMessages = chatMessages[len(chatMessages)-50:]
+	}
 
 	// 3. Build chat context
 	var chatCtx *aiclient.ChatContext
@@ -761,8 +765,14 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Call AI Engine
+	// The AI Engine expects snake_case mode ids ("deep_dive"); conversations may store
+	// the hyphenated UI id ("deep-dive"). An empty mode falls back to the default.
+	mode := strings.ReplaceAll(conv.TutorMode, "-", "_")
+	if mode == "" {
+		mode = "explain"
+	}
 	chatReq := aiclient.ChatRequest{
-		Mode:     conv.TutorMode,
+		Mode:     mode,
 		Messages: chatMessages,
 		Context:  chatCtx,
 	}

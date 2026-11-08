@@ -24,12 +24,15 @@ const (
 )
 
 type fakeAI struct {
-	mu              sync.Mutex
-	failCourse      bool
-	invalidCourse   bool
-	lastCorrections string
-	lastAdditional  string
-	lastPrevious    string
+	mu               sync.Mutex
+	failCourse       bool
+	invalidCourse    bool
+	lastCorrections  string
+	lastAdditional   string
+	lastPrevious     string
+	lastChatMode     string
+	lastChatContext  *aiclient.ChatContext
+	lastChatMessages []aiclient.ChatMessage
 }
 
 func (f *fakeAI) setFailure(fail, invalid bool) {
@@ -140,6 +143,31 @@ func (f *fakeAI) handler(t *testing.T) http.Handler {
 		}
 		_ = json.NewEncoder(w).Encode(domain.CourseGenerationResult{
 			Course: course, Warnings: []string{}, Metadata: fakeMetadata(),
+		})
+	})
+	mux.HandleFunc("/internal/v1/chat", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Internal-Token") != internalToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		var request aiclient.ChatRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode chat request: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		f.mu.Lock()
+		f.lastChatMode = request.Mode
+		f.lastChatContext = request.Context
+		f.lastChatMessages = request.Messages
+		f.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(aiclient.ChatResponse{
+			Success: true,
+			Data: &aiclient.ChatResponseData{
+				Text: "A tutor reply from the engine.", Model: "frikhii-deterministic-v1",
+				Provider: "mock", TutorMode: request.Mode,
+				Usage: map[string]any{}, DurationMS: 3,
+			},
 		})
 	})
 	return mux
@@ -551,5 +579,49 @@ func TestHTTPCORSAndRequestID(t *testing.T) {
 	api.handler.ServeHTTP(recorder, req)
 	if recorder.Header().Get("X-Request-ID") == "" {
 		t.Fatal("request id was not returned")
+	}
+}
+
+func TestTutorConversationFlow(t *testing.T) {
+	api := newTestAPI(t)
+
+	created := api.request(t, http.MethodPost, "/api/v1/conversations", apiTestUser, map[string]any{
+		"title":      "Deep Dive - Go Foundations",
+		"tutor_mode": "deep-dive",
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create conversation: status %d body %s", created.Code, created.Body.String())
+	}
+	conversation := decodeBody[struct {
+		Conversation domain.Conversation `json:"conversation"`
+	}](t, created).Conversation
+
+	sent := api.request(t, http.MethodPost, "/api/v1/conversations/"+conversation.ID+"/messages", apiTestUser, map[string]any{
+		"content": "What does this concept mean?",
+		"context": map[string]any{"course_title": "Go Foundations", "lesson_title": "Goroutines"},
+	})
+	if sent.Code != http.StatusOK {
+		t.Fatalf("send message: status %d body %s", sent.Code, sent.Body.String())
+	}
+	result := decodeBody[struct {
+		AssistantMessage domain.Message `json:"assistant_message"`
+	}](t, sent)
+	if result.AssistantMessage.Content != "A tutor reply from the engine." {
+		t.Errorf("assistant content = %q", result.AssistantMessage.Content)
+	}
+
+	api.ai.mu.Lock()
+	mode := api.ai.lastChatMode
+	chatContext := api.ai.lastChatContext
+	messageCount := len(api.ai.lastChatMessages)
+	api.ai.mu.Unlock()
+	if mode != "deep_dive" {
+		t.Errorf("AI mode = %q, want %q", mode, "deep_dive")
+	}
+	if chatContext == nil || chatContext.CourseTitle != "Go Foundations" || chatContext.LessonTitle != "Goroutines" {
+		t.Errorf("AI context = %+v", chatContext)
+	}
+	if messageCount != 1 {
+		t.Errorf("AI message count = %d, want 1", messageCount)
 	}
 }
