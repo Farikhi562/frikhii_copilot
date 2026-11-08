@@ -15,12 +15,25 @@ import (
 // It intentionally mirrors the lifecycle and ownership checks of Postgres so
 // HTTP behaviour can be tested without a database.
 type Memory struct {
-	mu          sync.RWMutex
-	goals       map[string]*domain.LearningGoal
-	attempts    map[string]*memoryAttempt
-	courses     map[string]*memoryCourse
-	enrollments map[string]bool
-	now         func() time.Time
+	mu                sync.RWMutex
+	goals             map[string]*domain.LearningGoal
+	attempts          map[string]*memoryAttempt
+	courses           map[string]*memoryCourse
+	enrollments       map[string]bool
+	conversations     map[string]*domain.Conversation
+	messages          map[string][]domain.Message
+	lessonCompletions map[string]map[string]bool // userID -> set of lessonIDs
+	quizzes           map[string]*memoryQuiz
+	now               func() time.Time
+}
+
+type memoryQuiz struct {
+	userID    string
+	courseID  string
+	classID   string
+	attempt   domain.QuizAttempt
+	keys      map[string]domain.QuizAnswerKey
+	updatedAt time.Time
 }
 
 type memoryAttempt struct {
@@ -43,11 +56,15 @@ type memoryCourse struct {
 
 func NewMemory() *Memory {
 	return &Memory{
-		goals:       map[string]*domain.LearningGoal{},
-		attempts:    map[string]*memoryAttempt{},
-		courses:     map[string]*memoryCourse{},
-		enrollments: map[string]bool{},
-		now:         time.Now,
+		goals:             map[string]*domain.LearningGoal{},
+		attempts:          map[string]*memoryAttempt{},
+		courses:           map[string]*memoryCourse{},
+		enrollments:       map[string]bool{},
+		conversations:     map[string]*domain.Conversation{},
+		messages:          map[string][]domain.Message{},
+		lessonCompletions: map[string]map[string]bool{},
+		quizzes:           map[string]*memoryQuiz{},
+		now:               time.Now,
 	}
 }
 
@@ -764,4 +781,554 @@ func stringPtr(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func (m *Memory) CreateConversation(_ context.Context, userID string, input domain.CreateConversationInput) (*domain.Conversation, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := m.now().UTC()
+	title := stringsTrim(input.Title)
+	if title == "" {
+		title = "New conversation"
+	}
+	mode := stringsTrim(input.TutorMode)
+	if mode == "" {
+		mode = "explain"
+	}
+
+	conv := &domain.Conversation{
+		ID:          uuid.NewString(),
+		UserID:      userID,
+		Title:       title,
+		TutorMode:   mode,
+		ContextType: input.ContextType,
+		ContextID:   input.ContextID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	m.conversations[conv.ID] = conv
+	m.messages[conv.ID] = []domain.Message{}
+	return conv, nil
+}
+
+func (m *Memory) ListConversations(_ context.Context, userID string) ([]domain.Conversation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []domain.Conversation
+	for _, conv := range m.conversations {
+		if conv.UserID == userID {
+			result = append(result, *conv)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].UpdatedAt.After(result[j].UpdatedAt)
+	})
+	return result, nil
+}
+
+func (m *Memory) GetConversation(_ context.Context, userID, conversationID string) (*domain.ConversationDetail, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	conv, exists := m.conversations[conversationID]
+	if !exists || conv.UserID != userID {
+		return nil, ErrNotFound
+	}
+	msgs := m.messages[conversationID]
+	if msgs == nil {
+		msgs = []domain.Message{}
+	}
+	return &domain.ConversationDetail{
+		Conversation: *conv,
+		Messages:     msgs,
+	}, nil
+}
+
+func (m *Memory) UpdateConversation(_ context.Context, userID, conversationID string, input domain.UpdateConversationInput) (*domain.Conversation, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	conv, exists := m.conversations[conversationID]
+	if !exists || conv.UserID != userID {
+		return nil, ErrNotFound
+	}
+	if input.Title != nil && stringsTrim(*input.Title) != "" {
+		conv.Title = stringsTrim(*input.Title)
+	}
+	if input.TutorMode != nil && stringsTrim(*input.TutorMode) != "" {
+		conv.TutorMode = stringsTrim(*input.TutorMode)
+	}
+	conv.UpdatedAt = m.now().UTC()
+	return conv, nil
+}
+
+func (m *Memory) DeleteConversation(_ context.Context, userID, conversationID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	conv, exists := m.conversations[conversationID]
+	if !exists || conv.UserID != userID {
+		return ErrNotFound
+	}
+	delete(m.conversations, conversationID)
+	delete(m.messages, conversationID)
+	return nil
+}
+
+func (m *Memory) AddMessage(_ context.Context, userID, conversationID string, role, content, model string, tokenUsage, metadata map[string]any) (*domain.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	conv, exists := m.conversations[conversationID]
+	if !exists || conv.UserID != userID {
+		return nil, ErrNotFound
+	}
+	now := m.now().UTC()
+	msg := domain.Message{
+		ID:             uuid.NewString(),
+		ConversationID: conversationID,
+		UserID:         userID,
+		Role:           role,
+		Content:        content,
+		Model:          model,
+		TokenUsage:     tokenUsage,
+		Metadata:       metadata,
+		CreatedAt:      now,
+	}
+	m.messages[conversationID] = append(m.messages[conversationID], msg)
+	conv.UpdatedAt = now
+	return &msg, nil
+}
+
+func (m *Memory) CompleteLesson(_ context.Context, userID, courseID, lessonID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.lessonCompletions[userID] == nil {
+		m.lessonCompletions[userID] = map[string]bool{}
+	}
+	m.lessonCompletions[userID][lessonID] = true
+	return nil
+}
+
+func (m *Memory) GetCompletedLessons(_ context.Context, userID, courseID string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	userCompletions := m.lessonCompletions[userID]
+	if userCompletions == nil {
+		return []string{}, nil
+	}
+	var result []string
+	for lessonID := range userCompletions {
+		result = append(result, lessonID)
+	}
+	return result, nil
+}
+
+func (m *Memory) approvedVersionLocked(course *memoryCourse) *domain.CourseVersion {
+	if course == nil || course.approvedID == "" {
+		return nil
+	}
+	return course.versions[course.approvedID]
+}
+
+func (m *Memory) ownedClassLocked(userID, courseID, classID string) (*memoryCourse, *domain.CourseClass, bool) {
+	course, ok := m.courses[courseID]
+	if !ok || course.userID != userID {
+		return nil, nil, false
+	}
+	version := m.approvedVersionLocked(course)
+	if version == nil {
+		return nil, nil, false
+	}
+	for moduleIndex := range version.Modules {
+		for classIndex := range version.Modules[moduleIndex].Classes {
+			klass := &version.Modules[moduleIndex].Classes[classIndex]
+			if klass.ID == classID {
+				return course, klass, true
+			}
+		}
+	}
+	return nil, nil, false
+}
+
+func (m *Memory) latestQuizLocked(userID, courseID, classID string) *memoryQuiz {
+	var latest *memoryQuiz
+	for _, quiz := range m.quizzes {
+		if quiz.userID != userID || quiz.courseID != courseID || quiz.classID != classID {
+			continue
+		}
+		if latest == nil || quiz.attempt.AttemptNumber > latest.attempt.AttemptNumber {
+			latest = quiz
+		}
+	}
+	return latest
+}
+
+func (m *Memory) CreateQuizAttempt(_ context.Context, userID, courseID, classID string, passingScore int, questions []QuizQuestion, keys []domain.QuizAnswerKey) (*domain.QuizAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, _, ok := m.ownedClassLocked(userID, courseID, classID); !ok {
+		return nil, ErrNotFound
+	}
+	if latest := m.latestQuizLocked(userID, courseID, classID); latest != nil && latest.attempt.Status == "ready" {
+		return cloneQuizAttempt(&latest.attempt), nil
+	}
+	number := 1
+	for _, quiz := range m.quizzes {
+		if quiz.userID == userID && quiz.courseID == courseID && quiz.classID == classID {
+			if quiz.attempt.AttemptNumber >= number {
+				number = quiz.attempt.AttemptNumber + 1
+			}
+		}
+	}
+	if passingScore < 1 || passingScore > 100 {
+		passingScore = 80
+	}
+	now := m.now().UTC()
+	attempt := &memoryQuiz{
+		userID:    userID,
+		courseID:  courseID,
+		classID:   classID,
+		updatedAt: now,
+		attempt: domain.QuizAttempt{
+			ID:             uuid.NewString(),
+			CourseID:       courseID,
+			ClassID:        classID,
+			Status:         "ready",
+			AttemptNumber:  number,
+			PassingScore:   passingScore,
+			Strengths:      []string{},
+			Gaps:           []domain.KnowledgeGap{},
+			QuestionScores: []domain.QuizQuestionScore{},
+			CreatedAt:      now,
+		},
+		keys: map[string]domain.QuizAnswerKey{},
+	}
+	for _, key := range keys {
+		attempt.keys[key.QuestionID] = key
+	}
+	for _, question := range questions {
+		if _, ok := attempt.keys[question.SourceID]; !ok {
+			return nil, ErrInvalidState
+		}
+		dq := domain.QuizQuestion{
+			ID:         question.SourceID,
+			Sequence:   question.Sequence,
+			Type:       question.Type,
+			Prompt:     question.Prompt,
+			Competency: question.Competency,
+			Difficulty: question.Difficulty,
+			Choices:    append([]domain.Choice(nil), question.Choices...),
+		}
+		attempt.attempt.Questions = append(attempt.attempt.Questions, dq)
+	}
+	m.quizzes[attempt.attempt.ID] = attempt
+	return cloneQuizAttempt(&attempt.attempt), nil
+}
+
+func (m *Memory) latestQuizForClassLocked(userID, courseID, classID string) *memoryQuiz {
+	return m.latestQuizLocked(userID, courseID, classID)
+}
+
+func (m *Memory) GetLatestQuiz(_ context.Context, userID, courseID, classID string) (*domain.QuizAttempt, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, _, ok := m.ownedClassLocked(userID, courseID, classID); !ok {
+		return nil, ErrNotFound
+	}
+	latest := m.latestQuizForClassLocked(userID, courseID, classID)
+	if latest == nil {
+		return nil, ErrNotFound
+	}
+	return cloneQuizAttempt(&latest.attempt), nil
+}
+
+func (m *Memory) GetQuizForEvaluation(_ context.Context, userID, attemptID string) (*domain.QuizAttempt, []domain.QuizAnswerKey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	quiz, ok := m.quizzes[attemptID]
+	if !ok || quiz.userID != userID {
+		return nil, nil, ErrNotFound
+	}
+	keys := []domain.QuizAnswerKey{}
+	for _, key := range quiz.keys {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i].QuestionID < keys[j].QuestionID })
+	return cloneQuizAttempt(&quiz.attempt), keys, nil
+}
+
+func (m *Memory) SaveQuizEvaluation(_ context.Context, userID, attemptID string, answers []domain.QuizAnswer, evaluation domain.QuizEvaluation) (*domain.QuizAttempt, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	quiz, ok := m.quizzes[attemptID]
+	if !ok || quiz.userID != userID {
+		return nil, ErrNotFound
+	}
+	if quiz.attempt.Status == "evaluated" {
+		return cloneQuizAttempt(&quiz.attempt), nil
+	}
+	now := m.now().UTC()
+	score := evaluation.Score
+	passed := evaluation.Passed
+	quiz.attempt.Status = "evaluated"
+	quiz.attempt.Score = &score
+	quiz.attempt.Passed = &passed
+	quiz.attempt.Summary = stringPtr(evaluation.Summary)
+	quiz.attempt.Strengths = append([]string(nil), evaluation.Strengths...)
+	quiz.attempt.Gaps = append([]domain.KnowledgeGap(nil), evaluation.Gaps...)
+	quiz.attempt.QuestionScores = append([]domain.QuizQuestionScore(nil), evaluation.QuestionScores...)
+	quiz.attempt.Answers = cloneQuizAnswers(answers)
+	quiz.attempt.SubmittedAt = &now
+	quiz.attempt.EvaluatedAt = &now
+	quiz.updatedAt = now
+	return cloneQuizAttempt(&quiz.attempt), nil
+}
+
+func (m *Memory) ListLatestQuizzes(_ context.Context, userID, courseID string) ([]domain.QuizAttempt, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	course, ok := m.courses[courseID]
+	if !ok || course.userID != userID {
+		return nil, ErrNotFound
+	}
+	latest := map[string]*memoryQuiz{}
+	for _, quiz := range m.quizzes {
+		if quiz.userID != userID || quiz.courseID != courseID {
+			continue
+		}
+		if current, ok := latest[quiz.classID]; !ok || quiz.attempt.AttemptNumber > current.attempt.AttemptNumber {
+			latest[quiz.classID] = quiz
+		}
+	}
+	result := []domain.QuizAttempt{}
+	for _, quiz := range latest {
+		result = append(result, *cloneQuizAttempt(&quiz.attempt))
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
+	return result, nil
+}
+
+func cloneQuizAnswers(answers []domain.QuizAnswer) []domain.QuizAnswer {
+	result := make([]domain.QuizAnswer, len(answers))
+	for index, answer := range answers {
+		if answer.Score != nil {
+			value := *answer.Score
+			answer.Score = &value
+		}
+		result[index] = answer
+	}
+	return result
+}
+
+func cloneQuizAttempt(attempt *domain.QuizAttempt) *domain.QuizAttempt {
+	if attempt == nil {
+		return nil
+	}
+	data, err := json.Marshal(attempt)
+	if err != nil {
+		return nil
+	}
+	var copy domain.QuizAttempt
+	if err := json.Unmarshal(data, &copy); err != nil {
+		return nil
+	}
+	if copy.Strengths == nil {
+		copy.Strengths = []string{}
+	}
+	if copy.Gaps == nil {
+		copy.Gaps = []domain.KnowledgeGap{}
+	}
+	if copy.QuestionScores == nil {
+		copy.QuestionScores = []domain.QuizQuestionScore{}
+	}
+	return &copy
+}
+
+func (m *Memory) GetDashboard(ctx context.Context, userID string) (*domain.DashboardData, error) {
+	goals, _ := m.ListLearningGoals(ctx, userID)
+	courses, _ := m.ListCourses(ctx, userID)
+
+	approvedCount := 0
+	draftCount := 0
+	var activeCourse *domain.CourseSummary
+	for _, c := range courses {
+		if c.Status == "approved" {
+			approvedCount++
+			if activeCourse == nil {
+				activeCourse = &c
+			}
+		} else if c.HasDraft {
+			draftCount++
+		}
+	}
+
+	var recentGoal *domain.LearningGoal
+	if len(goals) > 0 {
+		recentGoal = &goals[0]
+	}
+
+	completedCount := 0
+	m.mu.RLock()
+	if userCompletions := m.lessonCompletions[userID]; userCompletions != nil {
+		completedCount = len(userCompletions)
+	}
+	m.mu.RUnlock()
+
+	return &domain.DashboardData{
+		TotalGoals:            len(goals),
+		TotalCourses:          len(courses),
+		ApprovedCourses:       approvedCount,
+		DraftCourses:          draftCount,
+		RecentGoal:            recentGoal,
+		ActiveCourse:          activeCourse,
+		CompletedLessonCount:  completedCount,
+		TotalStudyTimeMinutes: completedCount * 45, // realistic estimate based on completed lessons
+	}, nil
+}
+
+func (m *Memory) GetProgress(ctx context.Context, userID string) (*domain.ProgressData, error) {
+	courses, _ := m.ListCourses(ctx, userID)
+	var enrolled []domain.CourseSummary
+	totalLessons := 0
+	totalClasses := 0
+	totalModules := 0
+
+	for _, c := range courses {
+		if c.Status == "approved" {
+			enrolled = append(enrolled, c)
+			totalLessons += c.Counts.Lessons
+			totalModules += c.Counts.Modules
+			totalClasses += c.Counts.Classes
+		}
+	}
+
+	completed, _ := m.GetCompletedLessons(ctx, userID, "")
+
+	return &domain.ProgressData{
+		EnrolledCourses:    enrolled,
+		CompletedLessonIDs: completed,
+		TotalLessons:       totalLessons,
+		CompletedLessons:   len(completed),
+		TotalClasses:       totalClasses,
+		TotalModules:       totalModules,
+	}, nil
+}
+
+// ── Learning Engine stubs (Memory store — used in tests only) ───────────────
+
+func (m *Memory) GetLesson(_ context.Context, _, _, lessonID string) (*domain.LessonWithContents, error) {
+	return nil, ErrNotFound
+}
+func (m *Memory) SaveLessonAuthored(_ context.Context, _, _, _ string, _ any) error { return nil }
+func (m *Memory) GetExercise(_ context.Context, _, _, classID string) (*domain.ExerciseWithAuthored, error) {
+	return nil, ErrNotFound
+}
+func (m *Memory) SaveExerciseAuthored(_ context.Context, _, _, _ string, _ any) error { return nil }
+func (m *Memory) SubmitExercise(_ context.Context, userID, courseID, exerciseID, response string) (*domain.ExerciseSubmission, error) {
+	now := m.now().UTC()
+	return &domain.ExerciseSubmission{
+		ID:          "stub-" + exerciseID,
+		ExerciseID:  exerciseID,
+		CourseID:    courseID,
+		UserID:      userID,
+		Response:    response,
+		Status:      "submitted",
+		SubmittedAt: now,
+		CreatedAt:   now,
+	}, nil
+}
+func (m *Memory) GetRoadmap(_ context.Context, userID, courseID string) (*domain.Roadmap, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	course, ok := m.courses[courseID]
+	if !ok || course.userID != userID {
+		return nil, ErrNotFound
+	}
+	version := m.approvedVersionLocked(course)
+	if version == nil {
+		return nil, ErrNotFound
+	}
+	roadmap := &domain.Roadmap{
+		CourseID:         courseID,
+		Title:            version.Title,
+		ShortDescription: version.ShortDescription,
+		Approved:         true,
+		Modules:          []domain.RoadmapModule{},
+	}
+	for _, mod := range version.Modules {
+		rm := domain.RoadmapModule{
+			ID:          mod.ID,
+			Title:       mod.Title,
+			Description: mod.Description,
+			Sequence:    mod.Sequence,
+			Classes:     []domain.RoadmapClass{},
+		}
+		for _, cls := range mod.Classes {
+			rc := domain.RoadmapClass{
+				ID:          cls.ID,
+				Title:       cls.Title,
+				Description: cls.Description,
+				Sequence:    cls.Sequence,
+				Status:      domain.RoadmapClassAvailable,
+				Unlocked:    true,
+				TotalLessons: len(cls.Lessons),
+				PassingScore: 70,
+				Lessons:     []domain.RoadmapLesson{},
+				QuizStatus:  "not_started",
+			}
+			for _, l := range cls.Lessons {
+				rc.Lessons = append(rc.Lessons, domain.RoadmapLesson{
+					ID:          l.ID,
+					Title:       l.Title,
+					Description: l.Description,
+					Sequence:    l.Sequence,
+					Duration:    l.EstimatedDurationMinutes,
+					Status:      domain.RoadmapLessonAvailable,
+				})
+			}
+			rm.Classes = append(rm.Classes, rc)
+		}
+		roadmap.Modules = append(roadmap.Modules, rm)
+	}
+	return roadmap, nil
+}
+func (m *Memory) GetLatestRemedialPlan(_ context.Context, _, _, _ string) (*domain.RemedialPlanRecord, error) {
+	return nil, ErrNotFound
+}
+func (m *Memory) CreateRemedialPlan(_ context.Context, userID, courseID, classID, quizAttemptID string, plan any) (*domain.RemedialPlanRecord, error) {
+	data, _ := json.Marshal(plan)
+	now := m.now().UTC()
+	qid := quizAttemptID
+	return &domain.RemedialPlanRecord{
+		ID:            "stub-remedial",
+		CourseID:      courseID,
+		ClassID:       classID,
+		QuizAttemptID: &qid,
+		UserID:        userID,
+		Status:        "active",
+		GapSummary:    "Generated remedial plan.",
+		Plan:          data,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}, nil
+}
+
+func stringsTrim(s string) string {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t' || s[0] == '\n' || s[0] == '\r') {
+		s = s[1:]
+	}
+	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t' || s[len(s)-1] == '\n' || s[len(s)-1] == '\r') {
+		s = s[:len(s)-1]
+	}
+	return s
 }

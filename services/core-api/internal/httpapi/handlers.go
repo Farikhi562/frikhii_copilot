@@ -565,3 +565,238 @@ func limitStrings(values []string, limit int) []string {
 	}
 	return values[:limit]
 }
+
+func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
+	data, err := s.store.GetDashboard(r.Context(), userID(r))
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"dashboard": data})
+}
+
+func (s *Server) getProgress(w http.ResponseWriter, r *http.Request) {
+	data, err := s.store.GetProgress(r.Context(), userID(r))
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"progress": data})
+}
+
+func (s *Server) completeLesson(w http.ResponseWriter, r *http.Request) {
+	uid := userID(r)
+	courseID := chi.URLParam(r, "courseID")
+	lessonID := chi.URLParam(r, "lessonID")
+	if courseID == "" || lessonID == "" {
+		writeError(w, r, apiError{Status: http.StatusBadRequest, Code: "invalid_request", Message: "courseID and lessonID are required."})
+		return
+	}
+	if err := s.store.CompleteLesson(r.Context(), uid, courseID, lessonID); err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"completed": true, "lesson_id": lessonID})
+}
+
+func (s *Server) getCompletedLessons(w http.ResponseWriter, r *http.Request) {
+	uid := userID(r)
+	courseID := chi.URLParam(r, "courseID")
+	lessons, err := s.store.GetCompletedLessons(r.Context(), uid, courseID)
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"completed_lesson_ids": lessons})
+}
+
+func (s *Server) createConversation(w http.ResponseWriter, r *http.Request) {
+	var input domain.CreateConversationInput
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	conv, err := s.store.CreateConversation(r.Context(), userID(r), input)
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"conversation": conv})
+}
+
+func (s *Server) listConversations(w http.ResponseWriter, r *http.Request) {
+	convs, err := s.store.ListConversations(r.Context(), userID(r))
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"conversations": convs})
+}
+
+func (s *Server) getConversation(w http.ResponseWriter, r *http.Request) {
+	convID := chi.URLParam(r, "conversationID")
+	detail, err := s.store.GetConversation(r.Context(), userID(r), convID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, r, apiError{Status: http.StatusNotFound, Code: "not_found", Message: "Conversation not found."})
+			return
+		}
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": detail})
+}
+
+func (s *Server) updateConversation(w http.ResponseWriter, r *http.Request) {
+	convID := chi.URLParam(r, "conversationID")
+	var input domain.UpdateConversationInput
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	conv, err := s.store.UpdateConversation(r.Context(), userID(r), convID, input)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, r, apiError{Status: http.StatusNotFound, Code: "not_found", Message: "Conversation not found."})
+			return
+		}
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"conversation": conv})
+}
+
+func (s *Server) deleteConversation(w http.ResponseWriter, r *http.Request) {
+	convID := chi.URLParam(r, "conversationID")
+	if err := s.store.DeleteConversation(r.Context(), userID(r), convID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, r, apiError{Status: http.StatusNotFound, Code: "not_found", Message: "Conversation not found."})
+			return
+		}
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
+	uid := userID(r)
+	convID := chi.URLParam(r, "conversationID")
+
+	conv, err := s.store.GetConversation(r.Context(), uid, convID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, r, apiError{Status: http.StatusNotFound, Code: "not_found", Message: "Conversation not found."})
+			return
+		}
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+
+	var input domain.CreateMessageInput
+	if err := decodeJSON(w, r, &input); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	content := strings.TrimSpace(input.Content)
+	if content == "" {
+		writeError(w, r, apiError{Status: http.StatusBadRequest, Code: "empty_message", Message: "Message content cannot be empty."})
+		return
+	}
+	if len(content) > 10000 {
+		writeError(w, r, apiError{Status: http.StatusBadRequest, Code: "message_too_long", Message: "Message exceeds maximum length."})
+		return
+	}
+
+	// 1. Persist the user message
+	userMsg, err := s.store.AddMessage(r.Context(), uid, convID, "user", content, "", nil, input.Context)
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+
+	// 2. Prepare message history for AI Engine
+	var chatMessages []aiclient.ChatMessage
+	for _, m := range conv.Messages {
+		chatMessages = append(chatMessages, aiclient.ChatMessage{
+			Role:    m.Role,
+			Content: m.Content,
+		})
+	}
+	chatMessages = append(chatMessages, aiclient.ChatMessage{
+		Role:    "user",
+		Content: content,
+	})
+
+	// 3. Build chat context
+	var chatCtx *aiclient.ChatContext
+	if input.Context != nil {
+		chatCtx = &aiclient.ChatContext{}
+		if courseTitle, ok := input.Context["course_title"].(string); ok {
+			chatCtx.CourseTitle = courseTitle
+		}
+		if lessonTitle, ok := input.Context["lesson_title"].(string); ok {
+			chatCtx.LessonTitle = lessonTitle
+		}
+		if moduleTitle, ok := input.Context["module_title"].(string); ok {
+			chatCtx.ModuleTitle = moduleTitle
+		}
+		if classTitle, ok := input.Context["class_title"].(string); ok {
+			chatCtx.ClassTitle = classTitle
+		}
+		if level, ok := input.Context["user_level"].(string); ok {
+			chatCtx.UserLevel = level
+		}
+	}
+
+	// 4. Call AI Engine
+	chatReq := aiclient.ChatRequest{
+		Mode:     conv.TutorMode,
+		Messages: chatMessages,
+		Context:  chatCtx,
+	}
+
+	aiResp, err := s.ai.Chat(r.Context(), chatReq)
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+
+	if aiResp.Data == nil {
+		writeError(w, r, apiError{Status: http.StatusInternalServerError, Code: "ai_error", Message: "No response from AI Tutor."})
+		return
+	}
+
+	// 5. Persist assistant message
+	meta := map[string]any{
+		"provider":      aiResp.Data.Provider,
+		"fallback_used": aiResp.Data.FallbackUsed,
+		"duration_ms":   aiResp.Data.DurationMS,
+	}
+	assistantMsg, err := s.store.AddMessage(
+		r.Context(), uid, convID, "assistant",
+		aiResp.Data.Text, aiResp.Data.Model, aiResp.Data.Usage, meta,
+	)
+	if err != nil {
+		logServerError(r, err)
+		writeError(w, r, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"user_message":      userMsg,
+		"assistant_message": assistantMsg,
+	})
+}

@@ -1133,7 +1133,7 @@ func (p *Postgres) ListCourses(ctx context.Context, userID string) ([]domain.Cou
 	rows, err := p.pool.Query(ctx, `
 		select c.id::text, c.learning_goal_id::text, c.status,
 			coalesce(c.current_version_id::text,''), coalesce(c.approved_version_id::text,''),
-			coalesce(cv.id::text,''), coalesce(cv.status,''),
+			coalesce(cv.status,''),
 			coalesce(v.id::text,''), coalesce(v.version_number,0), coalesce(v.status,''),
 			coalesce(v.title,''), coalesce(v.short_description,''),
 			coalesce(v.target_learner_level,''), coalesce(v.estimated_duration_minutes,0),
@@ -1361,4 +1361,953 @@ func (p *Postgres) ApproveCourse(ctx context.Context, userID, courseID, versionI
 		return nil, err
 	}
 	return p.GetCourse(ctx, userID, courseID)
+}
+
+func (p *Postgres) CreateConversation(ctx context.Context, userID string, input domain.CreateConversationInput) (*domain.Conversation, error) {
+	title := input.Title
+	if title == "" {
+		title = "New conversation"
+	}
+	mode := input.TutorMode
+	if mode == "" {
+		mode = "explain"
+	}
+
+	var conv domain.Conversation
+	err := p.pool.QueryRow(ctx, `
+		insert into public.conversations (user_id, title, tutor_mode, context_type, context_id)
+		values ($1, $2, $3, $4, $5)
+		returning id, user_id, title, tutor_mode, context_type, context_id, created_at, updated_at`,
+		userID, title, mode, input.ContextType, input.ContextID,
+	).Scan(
+		&conv.ID, &conv.UserID, &conv.Title, &conv.TutorMode,
+		&conv.ContextType, &conv.ContextID, &conv.CreatedAt, &conv.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &conv, nil
+}
+
+func (p *Postgres) ListConversations(ctx context.Context, userID string) ([]domain.Conversation, error) {
+	rows, err := p.pool.Query(ctx, `
+		select id, user_id, title, tutor_mode, context_type, context_id, created_at, updated_at
+		from public.conversations
+		where user_id = $1
+		order by updated_at desc`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.Conversation
+	for rows.Next() {
+		var conv domain.Conversation
+		if err := rows.Scan(
+			&conv.ID, &conv.UserID, &conv.Title, &conv.TutorMode,
+			&conv.ContextType, &conv.ContextID, &conv.CreatedAt, &conv.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, conv)
+	}
+	if result == nil {
+		result = []domain.Conversation{}
+	}
+	return result, nil
+}
+
+func (p *Postgres) GetConversation(ctx context.Context, userID, conversationID string) (*domain.ConversationDetail, error) {
+	var conv domain.Conversation
+	err := p.pool.QueryRow(ctx, `
+		select id, user_id, title, tutor_mode, context_type, context_id, created_at, updated_at
+		from public.conversations
+		where id = $1 and user_id = $2`, conversationID, userID,
+	).Scan(
+		&conv.ID, &conv.UserID, &conv.Title, &conv.TutorMode,
+		&conv.ContextType, &conv.ContextID, &conv.CreatedAt, &conv.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select id, conversation_id, user_id, role, content, model, token_usage, metadata, created_at
+		from public.messages
+		where conversation_id = $1 and user_id = $2
+		order by created_at asc`, conversationID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []domain.Message
+	for rows.Next() {
+		var msg domain.Message
+		var tokenUsage, metadata []byte
+		if err := rows.Scan(
+			&msg.ID, &msg.ConversationID, &msg.UserID, &msg.Role, &msg.Content,
+			&msg.Model, &tokenUsage, &metadata, &msg.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if len(tokenUsage) > 0 {
+			_ = json.Unmarshal(tokenUsage, &msg.TokenUsage)
+		}
+		if len(metadata) > 0 {
+			_ = json.Unmarshal(metadata, &msg.Metadata)
+		}
+		messages = append(messages, msg)
+	}
+	if messages == nil {
+		messages = []domain.Message{}
+	}
+
+	return &domain.ConversationDetail{
+		Conversation: conv,
+		Messages:     messages,
+	}, nil
+}
+
+func (p *Postgres) UpdateConversation(ctx context.Context, userID, conversationID string, input domain.UpdateConversationInput) (*domain.Conversation, error) {
+	var conv domain.Conversation
+	err := p.pool.QueryRow(ctx, `
+		update public.conversations
+		set title = coalesce($1, title),
+		    tutor_mode = coalesce($2, tutor_mode),
+		    updated_at = now()
+		where id = $3 and user_id = $4
+		returning id, user_id, title, tutor_mode, context_type, context_id, created_at, updated_at`,
+		input.Title, input.TutorMode, conversationID, userID,
+	).Scan(
+		&conv.ID, &conv.UserID, &conv.Title, &conv.TutorMode,
+		&conv.ContextType, &conv.ContextID, &conv.CreatedAt, &conv.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &conv, nil
+}
+
+func (p *Postgres) DeleteConversation(ctx context.Context, userID, conversationID string) error {
+	tag, err := p.pool.Exec(ctx, `
+		delete from public.conversations
+		where id = $1 and user_id = $2`, conversationID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (p *Postgres) AddMessage(ctx context.Context, userID, conversationID string, role, content, model string, tokenUsage, metadata map[string]any) (*domain.Message, error) {
+	tokenUsageJSON, _ := json.Marshal(tokenUsage)
+	metadataJSON, _ := json.Marshal(metadata)
+
+	var msg domain.Message
+	var tokenUsageBytes, metadataBytes []byte
+
+	err := p.pool.QueryRow(ctx, `
+		insert into public.messages (conversation_id, user_id, role, content, model, token_usage, metadata)
+		values ($1, $2, $3, $4, $5, $6, $7)
+		returning id, conversation_id, user_id, role, content, model, token_usage, metadata, created_at`,
+		conversationID, userID, role, content, model, tokenUsageJSON, metadataJSON,
+	).Scan(
+		&msg.ID, &msg.ConversationID, &msg.UserID, &msg.Role, &msg.Content,
+		&msg.Model, &tokenUsageBytes, &metadataBytes, &msg.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(tokenUsageBytes) > 0 {
+		_ = json.Unmarshal(tokenUsageBytes, &msg.TokenUsage)
+	}
+	if len(metadataBytes) > 0 {
+		_ = json.Unmarshal(metadataBytes, &msg.Metadata)
+	}
+
+	_, _ = p.pool.Exec(ctx, `update public.conversations set updated_at = now() where id = $1`, conversationID)
+	return &msg, nil
+}
+
+func (p *Postgres) CompleteLesson(ctx context.Context, userID, courseID, lessonID string) error {
+	_, err := p.pool.Exec(ctx, `
+		insert into public.lesson_completions (user_id, course_id, lesson_id)
+		values ($1, $2, $3)
+		on conflict (user_id, lesson_id) do nothing`,
+		userID, courseID, lessonID,
+	)
+	return err
+}
+
+func (p *Postgres) GetCompletedLessons(ctx context.Context, userID, courseID string) ([]string, error) {
+	var rows pgx.Rows
+	var err error
+	if courseID != "" {
+		rows, err = p.pool.Query(ctx, `
+			select lesson_id from public.lesson_completions
+			where user_id = $1 and course_id = $2`, userID, courseID)
+	} else {
+		rows, err = p.pool.Query(ctx, `
+			select lesson_id from public.lesson_completions
+			where user_id = $1`, userID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var lessonID string
+		if err := rows.Scan(&lessonID); err != nil {
+			return nil, err
+		}
+		result = append(result, lessonID)
+	}
+	if result == nil {
+		result = []string{}
+	}
+	return result, nil
+}
+
+func (p *Postgres) GetDashboard(ctx context.Context, userID string) (*domain.DashboardData, error) {
+	goals, _ := p.ListLearningGoals(ctx, userID)
+	courses, _ := p.ListCourses(ctx, userID)
+
+	approvedCount := 0
+	draftCount := 0
+	var activeCourse *domain.CourseSummary
+	for _, c := range courses {
+		if c.Status == "approved" {
+			approvedCount++
+			if activeCourse == nil {
+				activeCourse = &c
+			}
+		} else if c.HasDraft {
+			draftCount++
+		}
+	}
+
+	var recentGoal *domain.LearningGoal
+	if len(goals) > 0 {
+		recentGoal = &goals[0]
+	}
+
+	completedLessons, _ := p.GetCompletedLessons(ctx, userID, "")
+
+	return &domain.DashboardData{
+		TotalGoals:            len(goals),
+		TotalCourses:          len(courses),
+		ApprovedCourses:       approvedCount,
+		DraftCourses:          draftCount,
+		RecentGoal:            recentGoal,
+		ActiveCourse:          activeCourse,
+		CompletedLessonCount:  len(completedLessons),
+		TotalStudyTimeMinutes: len(completedLessons) * 45,
+	}, nil
+}
+
+func (p *Postgres) GetProgress(ctx context.Context, userID string) (*domain.ProgressData, error) {
+	courses, _ := p.ListCourses(ctx, userID)
+	var enrolled []domain.CourseSummary
+	totalLessons := 0
+	totalClasses := 0
+	totalModules := 0
+
+	for _, c := range courses {
+		if c.Status == "approved" {
+			enrolled = append(enrolled, c)
+			totalLessons += c.Counts.Lessons
+			totalModules += c.Counts.Modules
+			totalClasses += c.Counts.Classes
+		}
+	}
+
+	completed, _ := p.GetCompletedLessons(ctx, userID, "")
+
+	return &domain.ProgressData{
+		EnrolledCourses:    enrolled,
+		CompletedLessonIDs: completed,
+		TotalLessons:       totalLessons,
+		CompletedLessons:   len(completed),
+		TotalClasses:       totalClasses,
+		TotalModules:       totalModules,
+	}, nil
+}
+
+// ============================================================================
+// Learning Engine — Postgres implementations
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// Lesson
+// ---------------------------------------------------------------------------
+
+func (p *Postgres) GetLesson(ctx context.Context, userID, courseID, lessonID string) (*domain.LessonWithContents, error) {
+	// Verify ownership and fetch lesson metadata.
+	var lesson domain.LessonWithContents
+	err := p.pool.QueryRow(ctx, `
+		select l.id::text, l.source_id, l.class_id::text, l.sequence_order,
+			l.title, l.description, l.estimated_duration_minutes
+		from public.lessons l
+		join public.classes cl on cl.id = l.class_id
+		join public.course_modules m on m.id = cl.module_id
+		join public.course_versions v on v.id = m.course_version_id
+		join public.courses c on c.id = v.course_id
+		where l.id = $1 and c.id = $2 and c.user_id = $3`,
+		lessonID, courseID, userID,
+	).Scan(&lesson.ID, &lesson.SourceID, &lesson.ClassID, &lesson.Sequence,
+		&lesson.Title, &lesson.Description, &lesson.EstimatedDurationMinutes)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(ctx, `
+		select content_type, content, sequence_order
+		from public.lesson_contents
+		where lesson_id = $1
+		order by sequence_order`, lessonID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	lesson.Contents = []domain.LessonContent{}
+	for rows.Next() {
+		var lc domain.LessonContent
+		var seq int
+		if err := rows.Scan(&lc.ContentType, &lc.Content, &seq); err != nil {
+			return nil, err
+		}
+		lesson.Contents = append(lesson.Contents, lc)
+	}
+	return &lesson, rows.Err()
+}
+
+func (p *Postgres) SaveLessonAuthored(ctx context.Context, userID, courseID, lessonID string, authored any) error {
+	data, err := json.Marshal(authored)
+	if err != nil {
+		return err
+	}
+	_, err = p.pool.Exec(ctx, `
+		insert into public.lesson_contents (lesson_id, content_type, content, sequence_order)
+		values ($1, 'authored', $2, 2)
+		on conflict (lesson_id, content_type, sequence_order) do update set content = excluded.content`,
+		lessonID, data)
+	return err
+}
+
+// ---------------------------------------------------------------------------
+// Exercise
+// ---------------------------------------------------------------------------
+
+func (p *Postgres) GetExercise(ctx context.Context, userID, courseID, classID string) (*domain.ExerciseWithAuthored, error) {
+	var ex domain.ExerciseWithAuthored
+	err := p.pool.QueryRow(ctx, `
+		select e.id::text, e.class_id::text, e.title, e.description,
+			e.difficulty, e.competency, e.instructions
+		from public.exercises e
+		join public.course_versions v on v.id = e.course_version_id
+		join public.courses c on c.id = v.course_id
+		where e.class_id = $1 and c.id = $2 and c.user_id = $3`,
+		classID, courseID, userID,
+	).Scan(&ex.ID, &ex.ClassID, &ex.Title, &ex.Description,
+		&ex.Difficulty, &ex.Competency, jsonBytes(&ex.Instructions))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if ex.Instructions == nil {
+		ex.Instructions = []string{}
+	}
+	// Check for authored content stored in exercises table authored_content column
+	// (stored as JSON in exercises.authored_content if column exists — gracefully skip if not).
+	return &ex, nil
+}
+
+func (p *Postgres) SaveExerciseAuthored(ctx context.Context, userID, courseID, exerciseID string, authored any) error {
+	// We store authored exercise content as a lesson_content-style JSON blob
+	// keyed by exercise_id in a simple upsert on the exercises table authored_content column.
+	// This column is added by the Phase 04 migration; silently skip if unavailable.
+	data, err := json.Marshal(authored)
+	if err != nil {
+		return err
+	}
+	_, _ = p.pool.Exec(ctx, `
+		update public.exercises set authored_content = $1 where id = $2`,
+		data, exerciseID)
+	return nil
+}
+
+func (p *Postgres) SubmitExercise(ctx context.Context, userID, courseID, exerciseID, response string) (*domain.ExerciseSubmission, error) {
+	var sub domain.ExerciseSubmission
+	err := p.pool.QueryRow(ctx, `
+		insert into public.exercise_submissions
+			(exercise_id, course_id, user_id, attempt_number, response, status)
+		values (
+			$1, $2, $3,
+			coalesce((select max(attempt_number) from public.exercise_submissions
+			          where exercise_id=$1 and user_id=$3), 0) + 1,
+			$4, 'submitted'
+		)
+		returning id::text, exercise_id::text, course_id::text, user_id::text,
+			attempt_number, response, score, feedback, status, submitted_at, evaluated_at, created_at`,
+		exerciseID, courseID, userID, response,
+	).Scan(&sub.ID, &sub.ExerciseID, &sub.CourseID, &sub.UserID,
+		&sub.AttemptNumber, &sub.Response, &sub.Score, &sub.Feedback,
+		&sub.Status, &sub.SubmittedAt, &sub.EvaluatedAt, &sub.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &sub, nil
+}
+
+// ---------------------------------------------------------------------------
+// Roadmap
+// ---------------------------------------------------------------------------
+
+func (p *Postgres) GetRoadmap(ctx context.Context, userID, courseID string) (*domain.Roadmap, error) {
+	course, err := p.GetCourse(ctx, userID, courseID)
+	if err != nil {
+		return nil, err
+	}
+	version := course.Version
+	if version == nil {
+		return nil, ErrNotFound
+	}
+
+	// Fetch completed lessons for this course.
+	completedSet := map[string]bool{}
+	if completedIDs, err := p.GetCompletedLessons(ctx, userID, courseID); err == nil {
+		for _, id := range completedIDs {
+			completedSet[id] = true
+		}
+	}
+
+	// Fetch latest quiz per class.
+	type quizRow struct {
+		classID  string
+		status   string
+		score    *int
+		passed   *bool
+		attemptID string
+		passing  int
+	}
+	quizMap := map[string]quizRow{}
+	qrows, err := p.pool.Query(ctx, `
+		select distinct on (class_id) class_id::text, status,
+			score, passed, id::text, passing_score
+		from public.quiz_attempts
+		where course_id = $1 and user_id = $2
+		order by class_id, attempt_number desc`, courseID, userID)
+	if err == nil {
+		defer qrows.Close()
+		for qrows.Next() {
+			var qr quizRow
+			_ = qrows.Scan(&qr.classID, &qr.status, &qr.score, &qr.passed, &qr.attemptID, &qr.passing)
+			quizMap[qr.classID] = qr
+		}
+	}
+
+	roadmap := &domain.Roadmap{
+		CourseID:         courseID,
+		Title:            version.Title,
+		ShortDescription: version.ShortDescription,
+		Approved:         course.Status == "approved",
+		Modules:          []domain.RoadmapModule{},
+	}
+	totalLessons, completedLessons, totalClasses, completedClasses := 0, 0, 0, 0
+
+	for _, mod := range version.Modules {
+		rm := domain.RoadmapModule{
+			ID: mod.ID, Title: mod.Title, Description: mod.Description,
+			Sequence: mod.Sequence, Classes: []domain.RoadmapClass{},
+		}
+		for _, cls := range mod.Classes {
+			totalClasses++
+			rc := domain.RoadmapClass{
+				ID:          cls.ID,
+				Title:       cls.Title,
+				Description: cls.Description,
+				Sequence:    cls.Sequence,
+				Unlocked:    true,
+				TotalLessons: len(cls.Lessons),
+				PassingScore: 70,
+				QuizStatus:  "not_started",
+				Lessons:     []domain.RoadmapLesson{},
+			}
+			if qr, ok := quizMap[cls.ID]; ok {
+				rc.QuizStatus = qr.status
+				rc.QuizScore = qr.score
+				if qr.attemptID != "" {
+					rc.QuizAttemptID = &qr.attemptID
+				}
+				rc.PassingScore = qr.passing
+			}
+
+			classCompleted := 0
+			for _, l := range cls.Lessons {
+				totalLessons++
+				status := domain.RoadmapLessonAvailable
+				if completedSet[l.ID] {
+					status = domain.RoadmapLessonCompleted
+					completedLessons++
+					classCompleted++
+				}
+				rc.Lessons = append(rc.Lessons, domain.RoadmapLesson{
+					ID: l.ID, Title: l.Title, Description: l.Description,
+					Sequence: l.Sequence, Duration: l.EstimatedDurationMinutes,
+					Status: status,
+				})
+			}
+			rc.CompletedLessons = classCompleted
+
+			switch {
+			case rc.QuizStatus == "evaluated" && rc.QuizScore != nil && rc.PassingScore > 0 && *rc.QuizScore >= rc.PassingScore:
+				rc.Status = domain.RoadmapClassCompleted
+				completedClasses++
+			case classCompleted > 0:
+				rc.Status = domain.RoadmapClassInProgress
+			case rc.QuizStatus == "evaluated":
+				rc.Status = domain.RoadmapClassNeedsReview
+			default:
+				rc.Status = domain.RoadmapClassAvailable
+			}
+
+			// Set next lesson/class hints.
+			if roadmap.NextClassID == nil && rc.Status == domain.RoadmapClassAvailable {
+				id := cls.ID
+				roadmap.NextClassID = &id
+			}
+			if roadmap.NextLessonID == nil {
+				for _, l := range rc.Lessons {
+					if l.Status == domain.RoadmapLessonAvailable {
+						id := l.ID
+						roadmap.NextLessonID = &id
+						break
+					}
+				}
+			}
+			rm.Classes = append(rm.Classes, rc)
+		}
+		roadmap.Modules = append(roadmap.Modules, rm)
+	}
+
+	roadmap.TotalLessons = totalLessons
+	roadmap.CompletedLessons = completedLessons
+	roadmap.TotalClasses = totalClasses
+	roadmap.CompletedClasses = completedClasses
+	if totalLessons > 0 {
+		roadmap.ProgressPercent = (completedLessons * 100) / totalLessons
+	}
+	return roadmap, nil
+}
+
+// ---------------------------------------------------------------------------
+// Quiz
+// ---------------------------------------------------------------------------
+
+func (p *Postgres) CreateQuizAttempt(ctx context.Context, userID, courseID, classID string, passingScore int, questions []QuizQuestion, keys []domain.QuizAnswerKey) (*domain.QuizAttempt, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Verify course ownership.
+	var dummy string
+	if err := tx.QueryRow(ctx, `select id from public.courses where id=$1 and user_id=$2`, courseID, userID).Scan(&dummy); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	var versionID string
+	if err := tx.QueryRow(ctx, `select coalesce(approved_version_id::text, current_version_id::text, '') from public.courses where id=$1`, courseID).Scan(&versionID); err != nil {
+		return nil, err
+	}
+
+	number := 1
+	if err := tx.QueryRow(ctx, `select coalesce(max(attempt_number),0)+1 from public.quiz_attempts where course_id=$1 and class_id=$2 and user_id=$3`, courseID, classID, userID).Scan(&number); err != nil {
+		return nil, err
+	}
+
+	var attemptID string
+	if err := tx.QueryRow(ctx, `
+		insert into public.quiz_attempts
+			(course_id, course_version_id, class_id, user_id, attempt_number, status, passing_score)
+		values ($1,$2,$3,$4,$5,'ready',$6)
+		returning id::text`,
+		courseID, versionID, classID, userID, number, passingScore,
+	).Scan(&attemptID); err != nil {
+		return nil, err
+	}
+
+	keyBySource := map[string]domain.QuizAnswerKey{}
+	for _, k := range keys {
+		keyBySource[k.QuestionID] = k
+	}
+	for _, q := range questions {
+		questionID := uuid.NewString()
+		if _, err := tx.Exec(ctx, `
+			insert into public.quiz_questions
+				(id, attempt_id, source_id, sequence_order, question_type, prompt,
+				 competency, difficulty, choices)
+			values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			questionID, attemptID, q.SourceID, q.Sequence, q.Type, q.Prompt,
+			q.Competency, q.Difficulty, marshalJSON(q.Choices),
+		); err != nil {
+			return nil, err
+		}
+		if k, ok := keyBySource[q.SourceID]; ok {
+			if _, err := tx.Exec(ctx, `
+				insert into public.quiz_answer_keys (question_id, expected_answer, rubric)
+				values ($1,$2,$3)`, questionID, k.ExpectedAnswer, marshalJSON(k.Rubric),
+			); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return p.GetLatestQuiz(ctx, userID, courseID, classID)
+}
+
+func (p *Postgres) GetLatestQuiz(ctx context.Context, userID, courseID, classID string) (*domain.QuizAttempt, error) {
+	var attempt domain.QuizAttempt
+	var submittedAt, evaluatedAt pgtype.Timestamptz
+	var summary string
+	err := p.pool.QueryRow(ctx, `
+		select id::text, course_id::text, class_id::text, status, attempt_number,
+			passing_score, score, passed, coalesce(summary,''),
+			strengths, gaps, question_scores, submitted_at, evaluated_at, created_at
+		from public.quiz_attempts
+		where course_id=$1 and class_id=$2 and user_id=$3
+		order by attempt_number desc limit 1`,
+		courseID, classID, userID,
+	).Scan(&attempt.ID, &attempt.CourseID, &attempt.ClassID, &attempt.Status,
+		&attempt.AttemptNumber, &attempt.PassingScore, &attempt.Score, &attempt.Passed,
+		&summary, jsonBytes(&attempt.Strengths), jsonBytes(&attempt.Gaps),
+		jsonBytes(&attempt.QuestionScores), &submittedAt, &evaluatedAt, &attempt.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if summary != "" {
+		attempt.Summary = &summary
+	}
+	if submittedAt.Valid {
+		t := submittedAt.Time
+		attempt.SubmittedAt = &t
+	}
+	if evaluatedAt.Valid {
+		t := evaluatedAt.Time
+		attempt.EvaluatedAt = &t
+	}
+	if attempt.Strengths == nil {
+		attempt.Strengths = []string{}
+	}
+	if attempt.Gaps == nil {
+		attempt.Gaps = []domain.KnowledgeGap{}
+	}
+	if attempt.QuestionScores == nil {
+		attempt.QuestionScores = []domain.QuizQuestionScore{}
+	}
+
+	// Load questions.
+	qrows, err := p.pool.Query(ctx, `
+		select id::text, source_id, sequence_order, question_type, prompt,
+			competency, difficulty, choices
+		from public.quiz_questions where attempt_id=$1 order by sequence_order`, attempt.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer qrows.Close()
+	qIDBySource := map[string]string{} // source_id -> db uuid (for answer lookup)
+	attempt.Questions = []domain.QuizQuestion{}
+	for qrows.Next() {
+		var q domain.QuizQuestion
+		var dbID string
+		if err := qrows.Scan(&dbID, &q.ID, &q.Sequence, &q.Type, &q.Prompt,
+			&q.Competency, &q.Difficulty, jsonBytes(&q.Choices)); err != nil {
+			return nil, err
+		}
+		if q.Choices == nil {
+			q.Choices = []domain.Choice{}
+		}
+		qIDBySource[q.ID] = dbID
+		attempt.Questions = append(attempt.Questions, q)
+	}
+	if err := qrows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Load answers if evaluated.
+	arows, err := p.pool.Query(ctx, `
+		select qq.source_id, qa.response, qa.score, qa.feedback
+		from public.quiz_answers qa
+		join public.quiz_questions qq on qq.id = qa.question_id
+		where qa.attempt_id = $1`, attempt.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer arows.Close()
+	attempt.Answers = []domain.QuizAnswer{}
+	for arows.Next() {
+		var a domain.QuizAnswer
+		if err := arows.Scan(&a.QuestionID, &a.Response, &a.Score, &a.Feedback); err != nil {
+			return nil, err
+		}
+		attempt.Answers = append(attempt.Answers, a)
+	}
+	return &attempt, arows.Err()
+}
+
+func (p *Postgres) GetQuizForEvaluation(ctx context.Context, userID, attemptID string) (*domain.QuizAttempt, []domain.QuizAnswerKey, error) {
+	var courseID, classID string
+	if err := p.pool.QueryRow(ctx, `select course_id::text, class_id::text from public.quiz_attempts where id=$1 and user_id=$2`, attemptID, userID).Scan(&courseID, &classID); errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, ErrNotFound
+	} else if err != nil {
+		return nil, nil, err
+	}
+
+	attempt, err := p.GetLatestQuiz(ctx, userID, courseID, classID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if attempt.ID != attemptID {
+		// The caller wants a specific attempt (not necessarily the latest).
+		// For simplicity, only support evaluating the latest attempt.
+		return nil, nil, ErrNotFound
+	}
+
+	// Fetch answer keys (service role only).
+	krows, err := p.pool.Query(ctx, `
+		select qq.source_id, k.expected_answer, k.rubric
+		from public.quiz_answer_keys k
+		join public.quiz_questions qq on qq.id = k.question_id
+		where qq.attempt_id = $1 order by qq.sequence_order`, attemptID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer krows.Close()
+	keys := []domain.QuizAnswerKey{}
+	for krows.Next() {
+		var k domain.QuizAnswerKey
+		if err := krows.Scan(&k.QuestionID, &k.ExpectedAnswer, jsonBytes(&k.Rubric)); err != nil {
+			return nil, nil, err
+		}
+		if k.Rubric == nil {
+			k.Rubric = []domain.RubricCriterion{}
+		}
+		keys = append(keys, k)
+	}
+	return attempt, keys, krows.Err()
+}
+
+func (p *Postgres) SaveQuizEvaluation(ctx context.Context, userID, attemptID string, answers []domain.QuizAnswer, evaluation domain.QuizEvaluation) (*domain.QuizAttempt, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var courseID, classID string
+	var status string
+	if err := tx.QueryRow(ctx, `select course_id::text, class_id::text, status from public.quiz_attempts where id=$1 and user_id=$2 for update`, attemptID, userID).Scan(&courseID, &classID, &status); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	if status == "evaluated" {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return p.GetLatestQuiz(ctx, userID, courseID, classID)
+	}
+
+	// Map source_id -> db question uuid for answer inserts.
+	qIDMap := map[string]string{}
+	qrows, err := tx.Query(ctx, `select source_id, id::text from public.quiz_questions where attempt_id=$1`, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	for qrows.Next() {
+		var src, dbID string
+		if err := qrows.Scan(&src, &dbID); err != nil {
+			qrows.Close()
+			return nil, err
+		}
+		qIDMap[src] = dbID
+	}
+	qrows.Close()
+
+	for _, a := range answers {
+		dbID, ok := qIDMap[a.QuestionID]
+		if !ok {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			insert into public.quiz_answers (attempt_id, question_id, user_id, response)
+			values ($1,$2,$3,$4)
+			on conflict (attempt_id, question_id) do update set response=excluded.response`,
+			attemptID, dbID, userID, a.Response); err != nil {
+			return nil, err
+		}
+	}
+	for _, score := range evaluation.QuestionScores {
+		dbID, ok := qIDMap[score.QuestionID]
+		if !ok {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			update public.quiz_answers set score=$1, feedback=$2
+			where attempt_id=$3 and question_id=$4`,
+			score.Score, score.Feedback, attemptID, dbID); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		update public.quiz_attempts
+		set status='evaluated', score=$1, passed=$2, summary=$3,
+			strengths=$4, gaps=$5, question_scores=$6,
+			submitted_at=coalesce(submitted_at,now()), evaluated_at=now()
+		where id=$7 and user_id=$8`,
+		evaluation.Score, evaluation.Passed, evaluation.Summary,
+		marshalJSON(evaluation.Strengths), marshalJSON(evaluation.Gaps),
+		marshalJSON(evaluation.QuestionScores),
+		attemptID, userID,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return p.GetLatestQuiz(ctx, userID, courseID, classID)
+}
+
+func (p *Postgres) ListLatestQuizzes(ctx context.Context, userID, courseID string) ([]domain.QuizAttempt, error) {
+	rows, err := p.pool.Query(ctx, `
+		select distinct on (class_id) id::text, course_id::text, class_id::text,
+			status, attempt_number, passing_score, score, passed
+		from public.quiz_attempts
+		where course_id=$1 and user_id=$2
+		order by class_id, attempt_number desc`, courseID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []domain.QuizAttempt
+	for rows.Next() {
+		var a domain.QuizAttempt
+		if err := rows.Scan(&a.ID, &a.CourseID, &a.ClassID, &a.Status,
+			&a.AttemptNumber, &a.PassingScore, &a.Score, &a.Passed); err != nil {
+			return nil, err
+		}
+		a.Strengths = []string{}
+		a.Gaps = []domain.KnowledgeGap{}
+		a.QuestionScores = []domain.QuizQuestionScore{}
+		a.Questions = []domain.QuizQuestion{}
+		a.Answers = []domain.QuizAnswer{}
+		result = append(result, a)
+	}
+	if result == nil {
+		result = []domain.QuizAttempt{}
+	}
+	return result, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Remedial plans
+// ---------------------------------------------------------------------------
+
+func (p *Postgres) GetLatestRemedialPlan(ctx context.Context, userID, courseID, classID string) (*domain.RemedialPlanRecord, error) {
+	var plan domain.RemedialPlanRecord
+	var quizAttemptID string
+	err := p.pool.QueryRow(ctx, `
+		select id::text, course_id::text, class_id::text,
+			coalesce(quiz_attempt_id::text,''), user_id::text,
+			status, gap_summary, plan, created_at, updated_at
+		from public.remedial_plans
+		where course_id=$1 and class_id=$2 and user_id=$3
+		order by created_at desc limit 1`,
+		courseID, classID, userID,
+	).Scan(&plan.ID, &plan.CourseID, &plan.ClassID, &quizAttemptID,
+		&plan.UserID, &plan.Status, &plan.GapSummary, &plan.Plan,
+		&plan.CreatedAt, &plan.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if quizAttemptID != "" {
+		plan.QuizAttemptID = &quizAttemptID
+	}
+	return &plan, nil
+}
+
+func (p *Postgres) CreateRemedialPlan(ctx context.Context, userID, courseID, classID, quizAttemptID string, plan any) (*domain.RemedialPlanRecord, error) {
+	data, err := json.Marshal(plan)
+	if err != nil {
+		return nil, err
+	}
+	type remedialPlanData struct {
+		GapSummary string `json:"gap_summary"`
+	}
+	var pd remedialPlanData
+	_ = json.Unmarshal(data, &pd)
+	gapSummary := pd.GapSummary
+	if gapSummary == "" {
+		gapSummary = "AI-generated remedial plan."
+	}
+
+	// Supersede any existing active plans for this class.
+	_, _ = p.pool.Exec(ctx, `
+		update public.remedial_plans set status='superseded'
+		where course_id=$1 and class_id=$2 and user_id=$3 and status='active'`,
+		courseID, classID, userID)
+
+	var record domain.RemedialPlanRecord
+	var qaid string
+	var qaidPtr *string
+	if quizAttemptID != "" {
+		qaidPtr = &quizAttemptID
+	}
+	err = p.pool.QueryRow(ctx, `
+		insert into public.remedial_plans
+			(course_id, class_id, quiz_attempt_id, user_id, status, gap_summary, plan)
+		values ($1,$2,$3::uuid,$4,'active',$5,$6)
+		returning id::text, course_id::text, class_id::text,
+			coalesce(quiz_attempt_id::text,''), user_id::text,
+			status, gap_summary, plan, created_at, updated_at`,
+		courseID, classID, qaidPtr, userID, gapSummary, data,
+	).Scan(&record.ID, &record.CourseID, &record.ClassID, &qaid,
+		&record.UserID, &record.Status, &record.GapSummary, &record.Plan,
+		&record.CreatedAt, &record.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if qaid != "" {
+		record.QuizAttemptID = &qaid
+	}
+	return &record, nil
 }

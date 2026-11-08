@@ -25,6 +25,16 @@ class MockProvider(LLMProvider):
             data = self._evaluate(payload)
         elif request.task == "curriculum_generate":
             data = self._curriculum(payload)
+        elif request.task == "lesson_generate":
+            data = self._lesson(payload)
+        elif request.task == "quiz_generate":
+            data = self._quiz(payload)
+        elif request.task == "quiz_evaluate":
+            data = self._quiz_evaluate(payload)
+        elif request.task == "exercise_generate":
+            data = self._exercise(payload)
+        elif request.task == "remedial_generate":
+            data = self._remedial(payload)
         else:  # pragma: no cover - guarded by service dispatch
             raise ValueError(f"Unsupported mock task: {request.task}")
         return ProviderResult(
@@ -503,4 +513,454 @@ class MockProvider(LLMProvider):
                 "The diagnostic is an estimate, not a certification.",
             ],
             "suggested_search_topics": [f"{title} fundamentals", f"{title} project examples"],
+        }
+
+
+    def _lesson(self, payload: dict[str, Any]) -> dict[str, Any]:
+        lesson_id = str(payload.get("lesson_id") or "lesson-1")
+        title = str(payload.get("title") or "Lesson").strip()
+        class_title = str(payload.get("class_title") or "Class").strip()
+        level = str(payload.get("learner_level") or "foundation")
+        sections = [
+            {
+                "type": "introduction",
+                "title": f"Why this lesson matters",
+                "body": (
+                    f"This lesson opens {class_title} by connecting what you already know to "
+                    f"the new ideas in {title}. Read the core idea first, then use the worked "
+                    "example to check your understanding before moving on."
+                ),
+                "items": [],
+            },
+            {
+                "type": "objective",
+                "title": "What you will be able to do",
+                "body": "By the end of this lesson you should be able to do the following on your own:",
+                "items": [
+                    f"Explain the key idea of {title} in your own words.",
+                    "Apply the idea to one small, concrete task.",
+                    "Spot one common mistake and describe how to avoid it.",
+                ],
+            },
+            {
+                "type": "concept",
+                "title": "The core idea",
+                "body": (
+                    f"The central concept of {title} is simple: each part has a purpose, and the "
+                    "parts work together as a system. Start from the definition, then trace what "
+                    "happens step by step when the idea is applied. If you can narrate each step "
+                    "and say why it happens, you understand the concept rather than just "
+                    "recognising it."
+                ),
+                "items": [
+                    "Definition: what the idea is and what problem it solves.",
+                    "Mechanism: what happens step by step when it is used.",
+                    "Boundaries: when it applies and when it does not.",
+                ],
+            },
+            {
+                "type": "analogy",
+                "title": "A quick analogy",
+                "body": (
+                    "Think of a workshop: you learn a tool on scrap material first, then use it "
+                    f"on the real piece. {title} works the same way - practise the idea on a small "
+                    "example before you rely on it for anything important."
+                ),
+                "items": [],
+            },
+            {
+                "type": "demonstration",
+                "title": "Worked example",
+                "body": (
+                    f"Take one small example of {title}. Work through it in order: state the "
+                    "input, apply the idea, observe the output, and explain why the output makes "
+                    "sense. Narrating each decision out loud turns passive reading into "
+                    "understanding."
+                ),
+                "items": [
+                    "State what you start with.",
+                    "Apply the idea one step at a time.",
+                    "Check the result against what you expected.",
+                ],
+            },
+            {
+                "type": "guided_practice",
+                "title": "Practice with guidance",
+                "body": (
+                    "Repeat the worked example with a different input. Compare your result with "
+                    "the example and note where your reasoning differed. Those differences are "
+                    "the most useful feedback you can get."
+                ),
+                "items": [],
+            },
+            {
+                "type": "independent_practice",
+                "title": "Practice on your own",
+                "body": (
+                    "Now apply the idea to a fresh task without looking at the worked example. "
+                    "Complete it, then check your answer against the criteria from the concept "
+                    "section."
+                ),
+                "items": [],
+            },
+            {
+                "type": "knowledge_check",
+                "title": "Quick check",
+                "body": (
+                    "Explain the core idea in two sentences and give one example of when you "
+                    "would use it. If you cannot do that yet, reread the concept section before "
+                    "continuing."
+                ),
+                "items": [],
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "body": (
+                    f"You have covered the core idea of {title}, seen a worked example, and "
+                    "practised it twice. The next lesson builds directly on this one, so make "
+                    "sure the quick check feels easy before moving on."
+                ),
+                "items": [],
+            },
+        ]
+        return {
+            "lesson_id": lesson_id,
+            "title": title[:240],
+            "estimated_duration_minutes": 30,
+            "sections": sections,
+            "key_takeaways": [
+                f"Explain the core idea of {title} before applying it.",
+                "Practise on a small example first, then on a fresh task.",
+                "Check your result against explicit criteria, not just intuition.",
+            ],
+            "further_search_topics": [f"{title} worked examples", f"{title} common mistakes"],
+        }
+
+    def _quiz(self, payload: dict[str, Any]) -> dict[str, Any]:
+        title = str(payload.get("class_title") or "Class").strip()
+        course = str(payload.get("course_title") or "Course").strip()
+        competencies = payload.get("competencies") or ["Applied understanding"]
+        competency = str(competencies[0])[:240] or "Applied understanding"
+        count = int(payload.get("question_count") or 5)
+        count = max(3, min(10, count))
+        templates = [
+            {
+                "type": "multiple_choice",
+                "prompt": f"After {title}, which activity best shows that you can apply the core idea independently?",
+                "choices": [
+                    {"id": "a", "text": "Complete a small unfamiliar task without step-by-step guidance"},
+                    {"id": "b", "text": "Re-read the lesson notes once more"},
+                    {"id": "c", "text": "Copy the worked example with different names"},
+                    {"id": "d", "text": " memorise the vocabulary list"},
+                ],
+                "answer": "a",
+                "explanation": "Independent transfer to a new task is the strongest evidence of application.",
+            },
+            {
+                "type": "short_answer",
+                "prompt": f"In 2-4 sentences, explain the main idea of {title} and give one concrete example of using it.",
+                "answer": "A clear explanation of the main idea plus one specific, concrete example of application.",
+                "rubric": [
+                    {"criterion": "Accurate explanation", "description": "States the main idea correctly.", "weight": 0.6},
+                    {"criterion": "Concrete example", "description": "Gives one specific example.", "weight": 0.4},
+                ],
+                "explanation": "Explanation plus example demonstrates both recall and application.",
+            },
+            {
+                "type": "scenario",
+                "prompt": f"You are using {title} in a real project and the result is wrong. Describe how you would diagnose and fix the problem.",
+                "answer": "Reproduce the problem, isolate the failing part, inspect the evidence, test one change at a time, and record the result.",
+                "rubric": [
+                    {"criterion": "Systematic diagnosis", "description": "Reproduces and isolates before changing anything.", "weight": 0.5},
+                    {"criterion": "One change at a time", "description": "Tests a single hypothesis per step.", "weight": 0.5},
+                ],
+                "explanation": "Systematic debugging is a transferable competency.",
+            },
+            {
+                "type": "reasoning",
+                "prompt": f"Why can memorising the steps of {title} fail when you face a new situation?",
+                "answer": "Memorised steps do not transfer; understanding the purpose of each step lets you adapt when the situation differs.",
+                "rubric": [
+                    {"criterion": "Distinguishes recall from transfer", "description": "Explains why memorisation fails on new inputs.", "weight": 0.6},
+                    {"criterion": "Names the adaptation", "description": "Says what understanding enables.", "weight": 0.4},
+                ],
+                "explanation": "Transfer requires understanding purpose, not just sequence.",
+            },
+            {
+                "type": "multiple_choice",
+                "prompt": f"What is the best way to check that you are ready for the next class in {course}?",
+                "choices": [
+                    {"id": "a", "text": "Explain the idea and complete one small task without help"},
+                    {"id": "b", "text": "Highlight every paragraph in the lesson"},
+                    {"id": "c", "text": "Watch the same explanation three times"},
+                    {"id": "d", "text": "Read the answers from a previous attempt"},
+                ],
+                "answer": "a",
+                "explanation": "Unaided explanation plus one task is a reliable readiness check.",
+            },
+            {
+                "type": "short_answer",
+                "prompt": "Describe one mistake you might make when applying this class concept, and how you would notice and correct it.",
+                "answer": "A specific plausible mistake, a way to detect it from the output, and a concrete correction.",
+                "rubric": [
+                    {"criterion": "Specific mistake", "description": "Names a plausible error.", "weight": 0.4},
+                    {"criterion": "Detection and correction", "description": "Explains how to notice and fix it.", "weight": 0.6},
+                ],
+                "explanation": "Anticipating errors is evidence of durable understanding.",
+            },
+            {
+                "type": "scenario",
+                "prompt": "A teammate asks you to explain this concept in one minute, without jargon. Write what you would say.",
+                "answer": "A plain-language summary with one everyday analogy and one concrete example.",
+                "rubric": [
+                    {"criterion": "Plain language", "description": "Avoids unexplained jargon.", "weight": 0.5},
+                    {"criterion": "Analogy plus example", "description": "Uses a relatable comparison and a concrete case.", "weight": 0.5},
+                ],
+                "explanation": "Simplifying without losing accuracy shows mastery.",
+            },
+            {
+                "type": "reasoning",
+                "prompt": "Why is finishing a lesson not the same as mastering the material?",
+                "answer": "Completion records exposure; mastery requires retrieving, explaining and applying the material later without support.",
+                "rubric": [
+                    {"criterion": "Exposure versus retrieval", "description": "Distinguishes reading from recall.", "weight": 0.5},
+                    {"criterion": "Names mastery evidence", "description": "Points to later unaided application.", "weight": 0.5},
+                ],
+                "explanation": "Mastery is demonstrated by delayed, unaided use.",
+            },
+            {
+                "type": "multiple_choice",
+                "prompt": f"When your {title} result differs from the expected result, what should you do first?",
+                "choices": [
+                    {"id": "a", "text": "Check your inputs and assumptions before changing the approach"},
+                    {"id": "b", "text": "Switch to a completely different method immediately"},
+                    {"id": "c", "text": "Change several things at once until something works"},
+                    {"id": "d", "text": "Ignore the difference if the code runs"},
+                ],
+                "answer": "a",
+                "explanation": "Verify inputs and assumptions first; change one thing at a time after that.",
+            },
+            {
+                "type": "short_answer",
+                "prompt": "What would you search for next to deepen your understanding of this class topic, and why that resource?",
+                "answer": "A specific follow-up topic and a reason it targets the remaining gap, such as a worked example set or an official reference.",
+                "rubric": [
+                    {"criterion": "Targeted topic", "description": "Names a topic that closes a real gap.", "weight": 0.5},
+                    {"criterion": "Reasoned choice", "description": "Explains why that resource.", "weight": 0.5},
+                ],
+                "explanation": "Choosing the next resource shows metacognitive control.",
+            },
+        ]
+        questions = []
+        keys = []
+        for index, template in enumerate(templates[:count], start=1):
+            qid = f"q{index}"
+            questions.append(
+                {
+                    "id": qid,
+                    "sequence": index,
+                    "type": template["type"],
+                    "prompt": template["prompt"],
+                    "competency": competency,
+                    "difficulty": "foundation" if index <= 3 else "intermediate",
+                    "choices": template.get("choices", []),
+                    "explanation": template["explanation"],
+                }
+            )
+            keys.append(
+                {
+                    "question_id": qid,
+                    "expected_answer": template["answer"],
+                    "rubric": template.get("rubric", []),
+                }
+            )
+        return {
+            "questions": questions,
+            "answer_keys": keys,
+            "passing_score": 80,
+        }
+
+    def _quiz_evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
+        questions = payload.get("questions", [])
+        keys = {item["question_id"]: item for item in payload.get("answer_keys", [])}
+        answers = {item["question_id"]: str(item.get("response", "")) for item in payload.get("answers", [])}
+        passing = int(payload.get("passing_score") or 70)
+        scores = []
+        total = 0
+        for question in questions:
+            qid = question["id"]
+            answer = answers.get(qid, "").strip()
+            key = keys.get(qid, {})
+            expected = str(key.get("expected_answer", "")).strip().lower()
+            if question.get("type") == "multiple_choice":
+                correct = answer.lower() == expected
+                score = 100 if correct else 20
+                feedback = "Correct choice." if correct else "This choice misses a key principle."
+            else:
+                if len(answer) < 15:
+                    score = 25
+                    feedback = "The answer is too brief to show understanding; add a concrete example."
+                else:
+                    answer_words = {word for word in answer.lower().split() if len(word) > 4}
+                    expected_words = {word for word in expected.split() if len(word) > 4}
+                    overlap = len(answer_words & expected_words) / max(1, len(expected_words))
+                    score = int(min(95, 50 + overlap * 50))
+                    feedback = (
+                        "Relevant understanding; add one concrete example to strengthen it."
+                        if score < 80
+                        else "Strong, specific answer with relevant reasoning."
+                    )
+            total += score
+            scores.append({"question_id": qid, "score": score, "feedback": feedback})
+
+        average = int(round(total / max(1, len(scores))))
+        passed = average >= passing
+        strong = [item for item in scores if item["score"] >= 80]
+        weak = [item for item in scores if item["score"] < passing]
+        class_title = str(payload.get("class_title") or "this class").strip()
+        gaps = []
+        if weak:
+            gaps.append(
+                {
+                    "competency": "Applied understanding",
+                    "description": f"{len(weak)} answer(s) in {class_title} show recognition but not yet reliable application.",
+                    "severity": "medium" if len(weak) > 1 else "low",
+                    "recommendation": "Review the class explanation, then complete one small task unaided before retrying.",
+                }
+            )
+        strengths = []
+        if strong:
+            strengths.append(
+                f"Solid answers on {len(strong)} question(s), especially the core concept questions."
+            )
+        summary = (
+            f"You scored {average}% against a {passing}% pass mark for {class_title}. "
+            + (
+                "The core ideas are in place; focus on the gaps listed below."
+                if passed
+                else "The gaps below need another pass before the next class unlocks."
+            )
+        )
+        return {
+            "evaluation": {
+                "score": max(0, min(100, average)),
+                "passed": passed,
+                "summary": summary,
+                "strengths": strengths,
+                "gaps": gaps,
+                "question_scores": scores,
+            }
+        }
+
+    def _exercise(self, payload: dict[str, Any]) -> dict[str, Any]:
+        title = str(payload.get("exercise_title") or "Practice task").strip()
+        class_title = str(payload.get("class_title") or "Class").strip()
+        return {
+            "title": title[:240],
+            "context": (
+                f"You have just finished {class_title}. This task asks you to use the class "
+                "concepts on a small, self-contained deliverable so you can see whether the "
+                "ideas hold outside the lesson."
+            ),
+            "steps": [
+                {
+                    "step_number": 1,
+                    "instruction": "Restate the task in your own words, including the input you are given and the result you must produce.",
+                    "hint": "One or two sentences is enough; the point is to fix the goal in your own terms.",
+                },
+                {
+                    "step_number": 2,
+                    "instruction": "Build the smallest working version that satisfies the task, using the core idea from the class.",
+                    "hint": "Do not add extra features yet; correctness first.",
+                },
+                {
+                    "step_number": 3,
+                    "instruction": "Check your result against the evaluation criteria and record one limitation you noticed.",
+                    "hint": "Name a real limitation, even a small one - it shows you understand the boundaries.",
+                },
+            ],
+            "expected_deliverable": (
+                "A small working artefact plus a short reflection: what you built, which class "
+                "concept you used, and one limitation with an idea for improving it."
+            ),
+            "evaluation_criteria": [
+                "The artefact produces the correct result for the stated input.",
+                "The explanation names the class concept that makes it work.",
+                "The reflection identifies one honest limitation.",
+            ],
+            "further_search_topics": [f"{class_title} worked examples", "testing small deliverables"],
+        }
+
+    def _remedial(self, payload: dict[str, Any]) -> dict[str, Any]:
+        class_title = str(payload.get("class_title") or "Class").strip()
+        course_title = str(payload.get("course_title") or "Course").strip()
+        score = int(payload.get("quiz_score") or 0)
+        passing = int(payload.get("passing_score") or 70)
+        gaps = payload.get("gaps") or []
+        gap_names = [str(gap.get("competency") or "core concept") for gap in gaps][:3]
+        weekly = int(payload.get("weekly_study_minutes") or 300)
+        per_session = max(15, min(60, weekly // 4))
+        concepts = gap_names or ["core concept"]
+        return {
+            "gap_summary": (
+                f"Your {class_title} assessment scored {score}% against a {passing}% pass mark. "
+                f"The main gaps are: {', '.join(concepts)}. This plan re-closes them in small "
+                "sessions that fit your weekly study time."
+            ),
+            "estimated_total_minutes": min(600, per_session * 4),
+            "activities": [
+                {
+                    "sequence": 1,
+                    "title": f"Re-read the {class_title} explanation",
+                    "description": (
+                        "Read the class explanation once, then write a three-sentence summary "
+                        "of the main idea without looking. Compare and fix what you missed."
+                    ),
+                    "activity_type": "review",
+                    "estimated_minutes": per_session,
+                    "target_gap": concepts[0],
+                },
+                {
+                    "sequence": 2,
+                    "title": "Work one guided example",
+                    "description": (
+                        "Complete one worked example end to end, narrating why each step "
+                        "happens. Focus on the step that caused your wrong answers."
+                    ),
+                    "activity_type": "worked_example",
+                    "estimated_minutes": per_session,
+                    "target_gap": concepts[0],
+                },
+                {
+                    "sequence": 3,
+                    "title": "One unaided practice task",
+                    "description": (
+                        "Apply the concept to a fresh task without the worked solution, then "
+                        "check it against the evaluation criteria from the class exercise."
+                    ),
+                    "activity_type": "practice",
+                    "estimated_minutes": per_session,
+                    "target_gap": concepts[-1],
+                },
+                {
+                    "sequence": 4,
+                    "title": "Knowledge check retry",
+                    "description": (
+                        "Answer three questions about the gaps out loud or in writing before "
+                        "you retry the class assessment. If any answer feels shaky, revisit "
+                        "that step first."
+                    ),
+                    "activity_type": "knowledge_check",
+                    "estimated_minutes": max(10, per_session // 2),
+                    "target_gap": concepts[0],
+                },
+            ],
+            "key_concepts_to_revisit": concepts,
+            "further_search_topics": [f"{class_title} common mistakes", f"{course_title} fundamentals"],
+            "encouragement": (
+                "A below-pass score means the material needs one more pass, not that you "
+                "cannot learn it. Four short sessions usually close gaps like these - retry "
+                "the assessment once the unaided practice feels comfortable."
+            ),
         }

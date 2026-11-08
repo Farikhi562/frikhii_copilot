@@ -1,0 +1,252 @@
+{
+ "courses": [
+  {
+   "competencies": [
+    {
+     "accuracy_history": [
+      {
+       "at": "2026-10-02T09:00:00Z",
+       "mastery": 0.2,
+       "score": 0.2
+      },
+      {
+       "at": "2026-10-03T09:00:00Z",
+       "mastery": 0.257,
+       "score": 0.3
+      },
+      {
+       "at": "2026-10-04T09:00:00Z",
+       "mastery": 0.189,
+       "score": 0.1
+      }
+     ],
+     "attempts": 3,
+     "common_mistakes": [
+      {
+       "count": 3,
+       "tag": "chain rule"
+      }
+     ],
+     "competency": "Derivatives",
+     "confidence": 0.551,
+     "correct_attempts": 0,
+     "last_demonstrated_at": null,
+     "last_event_at": "2026-10-04T09:00:00Z",
+     "mastery": 0.189,
+     "peak_mastery": 0.189,
+     "regression": false,
+     "status": "learning"
+    },
+    {
+     "accuracy_history": [
+      {
+       "at": "2026-10-05T09:00:00Z",
+       "mastery": 0.3,
+       "score": 0.3
+      },
+      {
+       "at": "2026-10-06T09:00:00Z",
+       "mastery": 0.243,
+       "score": 0.2
+      },
+      {
+       "at": "2026-10-07T09:00:00Z",
+       "mastery": 0.246,
+       "score": 0.25
+      }
+     ],
+     "attempts": 3,
+     "common_mistakes": [],
+     "competency": "Gradient descent",
+     "confidence": 0.576,
+     "correct_attempts": 0,
+     "last_demonstrated_at": null,
+     "last_event_at": "2026-10-07T09:00:00Z",
+     "mastery": 0.246,
+     "peak_mastery": 0.246,
+     "regression": false,
+     "status": "learning"
+    },
+    {
+     "accuracy_history": [
+      {
+       "at": "2026-10-08T09:00:00Z",
+       "mastery": 0.9,
+       "score": 0.9
+      },
+      {
+       "at": "2026-10-09T09:00:00Z",
+       "mastery": 0.9,
+       "score": 0.9
+      },
+      {
+       "at": "2026-10-10T09:00:00Z",
+       "mastery": 0.9,
+       "score": 0.9
+      },
+      {
+       "at": "2026-10-11T09:00:00Z",
+       "mastery": 0.9,
+       "score": 0.9
+      },
+      {
+       "at": "2026-10-12T09:00:00Z",
+       "mastery": 0.9,
+       "score": 0.9
+      },
+      {
+       "at": "2026-10-13T09:00:00Z",
+       "mastery": 0.687,
+       "score": 0.2
+      }
+     ],
+     "attempts": 6,
+     "common_mistakes": [],
+     "competency": "Neural networks",
+     "confidence": 0.739,
+     "correct_attempts": 5,
+     "last_demonstrated_at": "2026-10-12T09:00:00Z",
+     "last_event_at": "2026-10-13T09:00:00Z",
+     "mastery": 0.687,
+     "peak_mastery": 0.9,
+     "regression": true,
+     "status": "developing"
+    }
+   ],
+   "course_id": "course-1",
+   "insights": [
+    {
+     "confidence": "medium",
+     "created_at": "2026-10-13T09:00:00Z",
+     "evidence_event_ids": [
+      "ev-0001",
+      "ev-0002",
+      "ev-0003"
+     ],
+     "id": "ins-0028",
+     "kind": "pattern",
+     "rationale": "This mistake was tagged 3 times across your attempts on Derivatives.",
+     "source": "rules",
+     "statement": "A recurring mistake in Derivatives: chain rule.",
+     "status": "active",
+     "user_note": ""
+    }
+   ],
+   "knowledge_gaps": [
+    {
+     "cause": "current_lesson",
+     "competency": "Derivatives",
+     "confidence": 0.551,
+     "evidence_event_ids": [
+      "ev-0001",
+      "ev-0002",
+      "ev-0003"
+     ],
+     "evidence_summary": "3 of the last 3 scored attempts on \"Derivatives\" were below 50% (current estimate 19%, 3 attempts).",
+     "id": "gap-0004",
+     "last_evidence_at": "2026-10-04T09:00:00Z",
+     "opened_at": "2026-10-04T09:00:00Z",
+     "prerequisites": null,
+     "recommendation": "Review the core idea of \"Derivatives\" with a worked example, then retry a short practice set.",
+     "related_objective": "",
+     "resolved_at": null,
+     "severity": "high",
+     "status": "open",
+     "unverified_prerequisites": null
+    },
+    {
+     "cause": "prerequisite",
+     "competency": "Gradient descent",
+     "confidence": 0.576,
+     "evidence_event_ids": [
+      "ev-0006",
+      "ev-0008",
+      "ev-0010"
+     ],
+     "evidence_summary": "3 of the last 3 scored attempts on \"Gradient descent\" were below 50% (current estimate 25%, 3 attempts).",
+     "id": "gap-0011",
+     "last_evidence_at": "2026-10-07T09:00:00Z",
+     "opened_at": "2026-10-07T09:00:00Z",
+     "prerequisites": [
+      "Derivatives"
+     ],
+     "recommendation": "Revisit Derivatives first, then return to \"Gradient descent\".",
+     "related_objective": "",
+     "resolved_at": null,
+     "severity": "high",
+     "status": "open",
+     "unverified_prerequisites": null
+    },
+    {
+     "cause": "retention",
+     "competency": "Neural networks",
+     "confidence": 0.739,
+     "evidence_event_ids": [
+      "ev-0026"
+     ],
+     "evidence_summary": "A retention check on \"Neural networks\" failed after earlier solid results (earlier peak 90%, now 69%).",
+     "id": "gap-0027",
+     "last_evidence_at": "2026-10-13T09:00:00Z",
+     "opened_at": "2026-10-13T09:00:00Z",
+     "prerequisites": [
+      "Gradient descent"
+     ],
+     "recommendation": "Do a short retrieval exercise on \"Neural networks\", then re-check it in a few days.",
+     "related_objective": "",
+     "resolved_at": null,
+     "severity": "medium",
+     "status": "open",
+     "unverified_prerequisites": null
+    }
+   ],
+   "prerequisites": {
+    "Gradient descent": [
+     "Derivatives"
+    ],
+    "Neural networks": [
+     "Gradient descent"
+    ]
+   },
+   "recommendations": [
+    {
+     "competency": "Derivatives",
+     "kind": "review_prerequisite",
+     "priority": 5,
+     "reason": "Before continuing with Gradient descent, review Derivatives. 3 of the last 3 scored attempts on \"Gradient descent\" were below 50% (current estimate 25%, 3 attempts). Strengthening it should make Gradient descent easier.",
+     "title": "Strengthen Derivatives"
+    },
+    {
+     "competency": "Neural networks",
+     "kind": "review_retention",
+     "priority": 10,
+     "reason": "A retention check on \"Neural networks\" failed after earlier solid results (earlier peak 90%, now 69%). A short retrieval exercise is the best next step.",
+     "title": "Refresh Neural networks"
+    },
+    {
+     "competency": "Derivatives",
+     "kind": "remediate",
+     "priority": 15,
+     "reason": "3 of the last 3 scored attempts on \"Derivatives\" were below 50% (current estimate 19%, 3 attempts). Review the core idea of \"Derivatives\" with a worked example, then retry a short practice set.",
+     "title": "Work through Derivatives again"
+    }
+   ],
+   "reviews": [
+    {
+     "competency": "Neural networks",
+     "due_at": "2026-10-14T09:00:00Z",
+     "interval_days": 1,
+     "repetitions": 0
+    }
+   ]
+  }
+ ],
+ "preferences": {
+  "daily_study_minutes": null,
+  "example_style": "mixed",
+  "explanation_style": "balanced",
+  "long_term_target": "",
+  "pace": "steady",
+  "preferred_language": "en-US",
+  "short_term_target": ""
+ }
+}
