@@ -1,0 +1,1 @@
+import{m as e}from"./index-s3JIaQUd.js";var t=`frikhii.sidebar.collapsed`;function n(){try{return window.localStorage.getItem(t)===`1`}catch{return!1}}function r(e){try{window.localStorage.setItem(t,e?`1`:`0`)}catch{}}var i=e((e,t)=>({collapsed:n(),setCollapsed:t=>{r(t),e({collapsed:t})},toggle:()=>t().setCollapsed(!t().collapsed)}));export{i as t};
