@@ -460,7 +460,7 @@ func (p *Postgres) CreateDiagnosticAttempt(ctx context.Context, userID, goalID s
 			values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
 			questionID, attemptID, question.SourceID, question.Sequence, question.Type,
 			question.Prompt, question.Competency, question.Difficulty,
-			marshalJSON(question.Choices), question.Explanation,
+			jsonbArray(question.Choices), question.Explanation,
 		); err != nil {
 			return nil, err
 		}
@@ -470,7 +470,7 @@ func (p *Postgres) CreateDiagnosticAttempt(ctx context.Context, userID, goalID s
 		}
 		if _, err := tx.Exec(ctx, `
 			insert into public.diagnostic_answer_keys (question_id, expected_answer, rubric)
-			values ($1,$2,$3)`, questionID, key.ExpectedAnswer, marshalJSON(key.Rubric),
+			values ($1,$2,$3)`, questionID, key.ExpectedAnswer, jsonbArray(key.Rubric),
 		); err != nil {
 			return nil, err
 		}
@@ -603,9 +603,9 @@ func (p *Postgres) SaveDiagnosticEvaluation(ctx context.Context, userID, goalID,
 		from public.learning_goals g
 		where a.id=$1 and a.learning_goal_id=$2 and g.id=a.learning_goal_id and g.user_id=$3`,
 		attemptID, goalID, userID, evaluation.EstimatedLevel, evaluation.Confidence,
-		evaluation.Summary, marshalJSON(evaluation.Strengths), marshalJSON(evaluation.Gaps),
-		marshalJSON(evaluation.Misconceptions), evaluation.RecommendedStart, evaluation.Rationale,
-		marshalJSON(evaluation.QuestionScores), marshalJSON(evaluation.CanSkip),
+		evaluation.Summary, jsonbArray(evaluation.Strengths), jsonbArray(evaluation.Gaps),
+		jsonbArray(evaluation.Misconceptions), evaluation.RecommendedStart, evaluation.Rationale,
+		jsonbArray(evaluation.QuestionScores), jsonbArray(evaluation.CanSkip),
 	)
 	if err != nil {
 		return nil, err
@@ -711,12 +711,12 @@ func (p *Postgres) CreateCourseVersion(ctx context.Context, userID, goalID strin
 		values ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 		returning id::text`,
 		courseID, versionNumber, blueprint.Title, blueprint.ShortDescription, blueprint.Description,
-		blueprint.LearningGoal, blueprint.TargetLearnerLevel, marshalJSON(blueprint.Objectives),
-		marshalJSON(blueprint.TargetCompetencies), marshalJSON(blueprint.Prerequisites),
+		blueprint.LearningGoal, blueprint.TargetLearnerLevel, jsonbArray(blueprint.Objectives),
+		jsonbArray(blueprint.TargetCompetencies), jsonbArray(blueprint.Prerequisites),
 		blueprint.EstimatedDurationMinutes, blueprint.RecommendedWeeklyStudyMinutes,
 		blueprint.Methodology, blueprint.ExpectedOutcome, marshalJSON(blueprint.FinalProject),
-		marshalJSON(blueprint.FinalAssessment), marshalJSON(blueprint.Assumptions),
-		marshalJSON(blueprint.SuggestedSearchTopics), marshalJSON(metadata), marshalJSON(warnings),
+		marshalJSON(blueprint.FinalAssessment), jsonbArray(blueprint.Assumptions),
+		jsonbArray(blueprint.SuggestedSearchTopics), jsonbObject(metadata), jsonbArray(warnings),
 	).Scan(&versionID); err != nil {
 		return nil, err
 	}
@@ -769,7 +769,7 @@ func (p *Postgres) CreateCourseVersion(ctx context.Context, userID, goalID strin
 				classID, versionID, moduleID, class.ID, class.Title, class.Description,
 				class.Sequence, marshalJSON(class.Objectives),
 				marshalJSON(class.PrerequisiteClassIDs), class.EstimatedDurationMinutes,
-				marshalJSON(class.KeyConcepts), marshalJSON(class.KnowledgeCheck),
+				marshalJSON(class.KeyConcepts), jsonbObject(class.KnowledgeCheck),
 			); err != nil {
 				return nil, err
 			}
@@ -797,7 +797,7 @@ func (p *Postgres) CreateCourseVersion(ctx context.Context, userID, goalID strin
 				}
 				if _, err := tx.Exec(ctx, `
 					insert into public.lesson_contents (lesson_id, content_type, content, sequence_order)
-					values ($1,'blueprint',$2,1)`, lessonID, marshalJSON(lesson.Blueprint),
+					values ($1,'blueprint',$2,1)`, lessonID, jsonbObject(lesson.Blueprint),
 				); err != nil {
 					return nil, err
 				}
@@ -1529,8 +1529,9 @@ func (p *Postgres) DeleteConversation(ctx context.Context, userID, conversationI
 }
 
 func (p *Postgres) AddMessage(ctx context.Context, userID, conversationID string, role, content, model string, tokenUsage, metadata map[string]any) (*domain.Message, error) {
-	// token_usage may be NULL; metadata must be a JSON object (messages_metadata_check).
-	tokenUsageJSON, _ := json.Marshal(tokenUsage)
+	// token_usage and metadata must be a JSON object (messages_*_check); a nil
+	// map would marshal to JSON null, which is neither SQL NULL nor an object.
+	tokenUsageJSON := jsonbObject(tokenUsage)
 	metadataJSON := jsonbObject(metadata)
 
 	var msg domain.Message
@@ -1717,11 +1718,9 @@ func (p *Postgres) GetLesson(ctx context.Context, userID, courseID, lessonID str
 }
 
 func (p *Postgres) SaveLessonAuthored(ctx context.Context, userID, courseID, lessonID string, authored any) error {
-	data, err := json.Marshal(authored)
-	if err != nil {
-		return err
-	}
-	_, err = p.pool.Exec(ctx, `
+	// content must be a JSON object (lesson_contents_content_check).
+	data := jsonbObject(authored)
+	_, err := p.pool.Exec(ctx, `
 		insert into public.lesson_contents (lesson_id, content_type, content, sequence_order)
 		values ($1, 'authored', $2, 2)
 		on conflict (lesson_id, content_type, sequence_order) do update set content = excluded.content`,
@@ -1989,14 +1988,14 @@ func (p *Postgres) CreateQuizAttempt(ctx context.Context, userID, courseID, clas
 				 competency, difficulty, choices)
 			values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 			questionID, attemptID, q.SourceID, q.Sequence, q.Type, q.Prompt,
-			q.Competency, q.Difficulty, marshalJSON(q.Choices),
+			q.Competency, q.Difficulty, jsonbArray(q.Choices),
 		); err != nil {
 			return nil, err
 		}
 		if k, ok := keyBySource[q.SourceID]; ok {
 			if _, err := tx.Exec(ctx, `
 				insert into public.quiz_answer_keys (question_id, expected_answer, rubric)
-				values ($1,$2,$3)`, questionID, k.ExpectedAnswer, marshalJSON(k.Rubric),
+				values ($1,$2,$3)`, questionID, k.ExpectedAnswer, jsonbArray(k.Rubric),
 			); err != nil {
 				return nil, err
 			}
